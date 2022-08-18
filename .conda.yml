@@ -1,0 +1,7 @@
+name: mts3
+dependencies:
+  - python
+  - pip
+  - matplotlib
+  - pip:
+    - mitsuba
