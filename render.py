@@ -320,7 +320,7 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
 
     out_path = os.path.splitext(os.path.split(_path)[-1])[0] +'.irrbin'
     measurements.tofile(out_path)
-    print('Irradiance (binary) file saved to: %s' % out_path)
+    print('Irradiance (binary, type: %s) file saved to: %s' % (measurements.dtype,out_path))
     
     #logging.debug(measurements)
 
