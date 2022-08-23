@@ -25,7 +25,7 @@ def create_base_scene(_size, _offset, _res=512):
             'type': 'perspective',
             'fov': 70,
             'to_world': mi.ScalarTransform4f.look_at(
-                origin=[_offset[0], _offset[1]+_size*2, _offset[2]+_size],
+                origin=[_offset[0], _offset[1]-_size*2, _offset[2]+_size],
                 target=_offset,
                 up=[0, 0, 1]),
             'film_base': {
@@ -185,11 +185,11 @@ def load_sim_scene(_scene_data):
             mi_scene[surface_name] = mesh
     return mi_scene
 
-def add_axis_spheres(mi_scene):
+def add_axis_spheres(mi_scene, _offset):
 
     mi_scene['sphere_x'] = {
         'type': 'sphere',
-        'to_world': mi.ScalarTransform4f.translate(offset).translate([0.5,0,0]).scale([0.2, 0.2, 0.2]),
+        'to_world': mi.ScalarTransform4f.translate(_offset).translate([0.5,0,0]).scale([0.2, 0.2, 0.2]),
         'bsdf': {
             'type': 'diffuse',
             'reflectance': {
@@ -201,7 +201,7 @@ def add_axis_spheres(mi_scene):
 
     mi_scene['sphere_y'] = {
         'type': 'sphere',
-        'to_world': mi.ScalarTransform4f.translate(offset).translate([0,0.5,0]).scale([0.2, 0.2, 0.2]),
+        'to_world': mi.ScalarTransform4f.translate(_offset).translate([0,0.5,0]).scale([0.2, 0.2, 0.2]),
         'bsdf': {
             'type': 'diffuse',
             'reflectance': {
@@ -213,7 +213,7 @@ def add_axis_spheres(mi_scene):
 
     mi_scene['sphere_z'] = {
         'type': 'sphere',
-        'to_world': mi.ScalarTransform4f.translate(offset).translate([0,0,0.5]).scale([0.2, 0.2, 0.2]),
+        'to_world': mi.ScalarTransform4f.translate(_offset).translate([0,0,0.5]).scale([0.2, 0.2, 0.2]),
         'bsdf': {
             'type': 'diffuse',
             'reflectance': {
@@ -247,10 +247,29 @@ def get_sun_direction( _lat, _long, _datetime_str):
     logging.debug("Date: %s, azimut: %f, altitude: %f", date, azimut, altitude)   
 
     azimut_in_rad = rad(azimut)
-    x, y = np.sin(azimut_in_rad), np.cos(azimut_in_rad)
+    y, x = np.sin(azimut_in_rad), np.cos(azimut_in_rad)
     z = np.sin(altitude * deg2rad)
 
     return [x, y, z]
+
+def test_sun():
+    
+    fig,ax = plt.subplots(1,1)
+    image = np.array(np.zeros((256, 256, 3)))
+    im = ax.imshow(image)
+
+    mi_scene = create_base_scene(5.0, [0,0,0], 512)
+    for i in range(6, 20):
+        datetime_str = '2022-08-23T%00d:00:00+02:00' % i
+        print(datetime_str)
+        sun_direction = get_sun_direction(48.21, 16.36, datetime_str)        
+        mi_scene['sun'] = get_sun(sun_direction, 100.0)
+        add_axis_spheres(mi_scene, [0,0,0])        
+        scene = mi.load_dict(mi_scene)
+        img = mi.render(scene)
+        im.set_data(mi.util.convert_to_bitmap(img))     
+        fig.canvas.draw_idle()
+        plt.pause(1)
 
 def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False):
     
@@ -285,7 +304,7 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
             }
         }
 
-    #add_axis_spheres(mi_scene)
+    #add_axis_spheres(mi_scene, offset)
 
     scene = mi.load_dict(mi_scene)
 
@@ -310,10 +329,12 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
         plt.figure()
         plt.axis("off")
         plt.imshow(mi.util.convert_to_bitmap(img))      
-        plt.show()
+        plt.draw()
 
 
 if __name__ == "__main__":
+
+    #test_sun(); quit()
 
     """
     Options:
