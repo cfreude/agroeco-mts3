@@ -1,7 +1,9 @@
 name: mts3
 dependencies:
-  - python
+  - python=3
   - pip
   - matplotlib
   - pip:
     - mitsuba
+    - pysolar
+    - python-dateutil
