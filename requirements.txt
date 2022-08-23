@@ -6,7 +6,7 @@ fonttools==4.25.0
 h5py==3.7.0
 idna==3.3
 kiwisolver==1.4.2
-lazrs==0.4.1
+lazrs==0.4.2
 matplotlib==3.5.1
 mitsuba==3.0.1
 mkl-fft==1.3.1
