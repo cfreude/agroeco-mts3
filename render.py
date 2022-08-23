@@ -299,8 +299,9 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
 
     measurements = np.sum(np.array(measurements), axis=1)
 
-    out_path = os.path.splitext(os.path.split(_path)[-1])[0]
-    measurements.tofile(out_path+'.irrbin')
+    out_path = os.path.splitext(os.path.split(_path)[-1])[0] +'.irrbin'
+    measurements.tofile(out_path)
+    print('Irradiance (binary) file saved to: %s' % out_path)
     
     #logging.debug(measurements)
 
@@ -329,7 +330,8 @@ if __name__ == "__main__":
 
     import argparse
 
-    # data/t700.mesh 48.21 16.36 2022-08-23T10:34:48+00:00
+    # example CMD
+    # python render.py data/t700.mesh 48.21 16.36 2022-08-23T10:34:48+00:00
 
     parser = argparse.ArgumentParser(description='Irradaince measurment tool based on Mitsuba 3.')
     parser.add_argument('scene_path', type=str, help='Path of the simulation scene file.')
@@ -342,7 +344,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.INFO)        
+        logging.basicConfig(level=logging.INFO)   
         #logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.ERROR)
