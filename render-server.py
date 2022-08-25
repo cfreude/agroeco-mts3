@@ -184,7 +184,7 @@ def get_sun_direction( _lat, _long, _datetime_str):
     date = dateutil.parser.parse(_datetime_str)
     date.replace(tzinfo=datetime.timezone.utc)
 
-    if 1:
+    if 0:
         print(date)
         print(date.date())
         print(date.time())
@@ -221,16 +221,16 @@ class RenderServer(BaseHTTPRequestHandler):
         global mi_scene
         global args
         length = int(self.headers['Content-Length'])
-        latitude, longitude, datetime = (self.headers['La'], self.headers['Lo'], self.headers['Ti'])
+        latitude, longitude, datetime = float(self.headers['La']), float(self.headers['Lo']), self.headers['Ti']
 
         rawData = self.rfile.read(length)
         sceneData = loadData(rawData)
         sim_objects = load_sim_scene(sceneData)
 
         merged_scene = {**mi_scene, **sim_objects}
-        #sun_direction = get_sun_direction(latitude, longitude, datetime)
-        #merged_scene['sun'] = get_sun(sun_direction, 1000.0)
-        merged_scene['sun'] = get_sun([0, -1, 0], 1000.0)
+        sun_direction = get_sun_direction(latitude, longitude, datetime)
+        merged_scene['sun'] = get_sun(sun_direction, 1000.0)
+        #merged_scene['sun'] = get_sun([0, -1, 0], 1000.0)
 
         sensor_count = len(sim_objects.keys())
         logging.debug("Sensor count: %d", sensor_count)
@@ -253,6 +253,8 @@ class RenderServer(BaseHTTPRequestHandler):
             plt.axis("off")
             plt.imshow(mi.util.convert_to_bitmap(img))
             plt.draw()
+    def log_message(self, format, *args):
+        return
 
 if __name__ == "__main__":
 
