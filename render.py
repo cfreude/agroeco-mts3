@@ -1,4 +1,4 @@
-import time, os, logging
+import time, os, logging, sys
 import dateutil
 import datetime
 import numpy as np
@@ -275,9 +275,10 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
     
     logging.info('Mitsuba3 - available variants: %s', mi.variants())
 
+    sim_scene = load(_path, _verbose)
+
     offset = [5, -5, 0]
 
-    sim_scene = load(_path, _verbose)
     mi_scene = create_base_scene(5.0, offset, 512)
     sun_direction = get_sun_direction(_lat, _long, _datetime_str,)
 
@@ -312,7 +313,7 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
     measurements = []
     for i in range(sensor_count):
         start = time.perf_counter_ns()    
-        img = mi.render(scene, sensor=i+1, spp=_ray_count)
+        img = mi.render(scene, sensor=i+1, spp=_ray_count, seed=i)
         measurements.append(img.array)            
         #time_sum += time.perf_counter_ns() - start
 
@@ -320,7 +321,7 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
 
     out_path = os.path.splitext(os.path.split(_path)[-1])[0] +'.irrbin'
     measurements.tofile(out_path)
-    print('Irradiance (binary, type: %s) file saved to: %s' % (measurements.dtype,out_path))
+    logging.info('Irradiance (binary, type: %s) file saved to: %s' % (measurements.dtype,out_path))
     
     #logging.debug(measurements)
 
@@ -335,6 +336,8 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
 if __name__ == "__main__":
 
     #test_sun(); quit()
+    
+    start = time.perf_counter_ns()
 
     """
     Options:
@@ -360,15 +363,19 @@ if __name__ == "__main__":
     parser.add_argument('long', type=float, help='Longitude of the simulation location.')    
     parser.add_argument('datetime_str', type=str, help='Time of day - should be in %Y-%m-%dT%H:%M:%S%z format')    
     parser.add_argument('--ray_count', type=int, default=128, help='Number of rays per element.')    
-    parser.add_argument('--verbose', type=bool, default=False, help='Number of rays per element.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Number of rays per element.')
 
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.INFO)   
+        logging.basicConfig(level=logging.INFO)        
         #logging.basicConfig(level=logging.DEBUG)
     else:
+        sys.stdout = open(os.devnull, "w")
+        sys.stderr = open(os.devnull, "w")        
+        mi.set_log_level(mi.LogLevel.Error)
         logging.basicConfig(level=logging.ERROR)
-
+        
     logging.debug('Args: %s', args)
     main(args.scene_path, args.lat, args.long, args.datetime_str, args.ray_count, _show_render=False)
+    logging.info('dur.: %.3f sec.' % ((time.perf_counter_ns()-start) * 1e-9))
