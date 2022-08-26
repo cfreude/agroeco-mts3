@@ -1,10 +1,10 @@
 import time, os, logging
 import dateutil
+import dateutil.parser
 import datetime
 import numpy as np
 import drjit as dr
 import mitsuba as mi
-from matplotlib import pyplot as plt
 from pysolar.solar import *
 from binary_loader import loadData
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -247,12 +247,9 @@ class RenderServer(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(bytes(measurements))
 
-        if args.show:
-            img = mi.render(scene)
-            plt.figure()
-            plt.axis("off")
-            plt.imshow(mi.util.convert_to_bitmap(img))
-            plt.draw()
+        #if args.show:
+        #    img = mi.render(scene)
+
     def log_message(self, format, *args):
         return
 
