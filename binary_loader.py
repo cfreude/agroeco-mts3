@@ -2,7 +2,7 @@ from distutils.log import error, warn
 from pprint import pprint
 import struct
 
-def load(_path, _verbose=False):
+def load_path(_path, _verbose=False):
 
     binary_array = []
 
@@ -26,10 +26,10 @@ def load(_path, _verbose=False):
     if _verbose:
         print(binary_array)
         print('#bytes:', len(binary_array))
-    return loadData(binary_array)
+    return load_binary(binary_array)
 
 
-def loadData(binary_array, _verbose=False):
+def load_binary(binary_array, _verbose=False):
     """
     #INDEXED DATA
     uint32 entitiesCount
