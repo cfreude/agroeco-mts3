@@ -16,12 +16,12 @@ class RenderServer(BaseHTTPRequestHandler):
         rawData = self.rfile.read(length)
 
         renderer.load_binary(rawData, latitude, longitude, datetime)
-        measurements = renderer.render(args.rays if rays == None or rays <= 0 else rays)
+        measurements = renderer.render(args.rays if rays == None else int(rays))
 
         self.send_response(200)
         self.send_header("Content-type", "application/octet-stream")
         self.end_headers()
-        self.wfile.write(bytes(measurements))
+        self.wfile.write(measurements.tobytes())
 
     def log_message(self, format, *args):
         return
