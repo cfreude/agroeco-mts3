@@ -3,16 +3,20 @@ from RendererMts3 import RendererMts3
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class RenderServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+
     def do_POST(self):
         global args
         global renderer
 
         length = int(self.headers['Content-Length'])
-        latitude, longitude, datetime = float(self.headers['La']), float(self.headers['Lo']), self.headers['Ti']
+        latitude, longitude, datetime, rays = float(self.headers['La']), float(self.headers['Lo']), self.headers['Ti'], self.headers['Ra']
         rawData = self.rfile.read(length)
 
         renderer.load_binary(rawData, latitude, longitude, datetime)
-        measurements = renderer.render(args.rays)        
+        measurements = renderer.render(args.rays if rays == None or rays <= 0 else rays)
 
         self.send_response(200)
         self.send_header("Content-type", "application/octet-stream")
