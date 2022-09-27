@@ -2,7 +2,7 @@ from distutils.log import error, warn
 from pprint import pprint
 import struct
 
-def load_path(_path, _verbose=False):
+def load_path(_path, _verbose=False, _return_binary=False):
 
     binary_array = []
 
@@ -26,7 +26,11 @@ def load_path(_path, _verbose=False):
     if _verbose:
         print(binary_array)
         print('#bytes:', len(binary_array))
-    return load_binary(binary_array)
+
+    if _return_binary:
+        return binary_array
+    else:
+        return load_binary(binary_array, _verbose)
 
 
 def load_binary(binary_array, _verbose=False):
