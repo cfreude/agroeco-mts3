@@ -24,14 +24,12 @@ if __name__ == "__main__":
     """
     Options:
     -h,--help | Print this help message and exit
-    --scene_path (string, required) | Path to Scene
-    --lat (flaot, required) | Latitude
-    --long (flaot, required) | Longitude
-    --rays-per-triangle (unsigned int, default=128) | Number of rays to cast from each triangle in the mesh
-    --time (string, required) Time of day - should be in %Y-%m-%dT%H:%M:%S%z format
-    --timestep (FLOAT, required) | Timestep (h)
-    --verbose | Be verbose.
-    --gui | Show GUI.
+    scene_path (string, required) | Path to Scene
+    lat (flaot, required) | Latitude
+    long (flaot, required) | Longitude
+    datetime_str (string, required) | Time of day - should be in %Y-%m-%dT%H:%M:%S%z format
+    --ray_count (int, default=128) | Number of rays to cast from each sensor
+    --verbose (bool, default=False) | Be verbose.
     """
 
     import argparse
@@ -43,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument('scene_path', type=str, help='Path of the simulation scene file.')
     parser.add_argument('lat', type=float, help='Latitude of the simulation location.')
     parser.add_argument('long', type=float, help='Longitude of the simulation location.')    
-    parser.add_argument('datetime_str', type=str, help='Time of day - should be in %Y-%m-%dT%H:%M:%S%z format')    
+    parser.add_argument('datetime_str', type=str, help='Date and time - should be in %Y-%m-%dT%H:%M:%S%z format')    
     parser.add_argument('--ray_count', type=int, default=128, help='Number of rays per element.')    
     parser.add_argument('--verbose', type=bool, default=False, help='Number of rays per element.')
 
