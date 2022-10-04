@@ -27,7 +27,7 @@ class RendererMts3():
 
         offset = [5, -5, 0]
         self.mi_base_scene = RendererMts3.create_base_scene(5.0, offset, 512)
-        
+
     def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
         self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
@@ -57,13 +57,20 @@ class RendererMts3():
             measurements.append(img.array)
         return np.sum(np.array(measurements), axis=1)
 
-    def show_render(self):        
+    #skips the rendering, useful just for testing the loading overhead
+    def render_dummy(self, _ray_count) -> None:
+        measurements = []
+        for i in range(self.sensor_count ):
+            measurements.append(1.0)
+        return np.array(measurements)
+
+    def show_render(self):
         img = mi.render(self.mi_scene)
         plt.figure()
         plt.axis("off")
-        plt.imshow(mi.util.convert_to_bitmap(img))      
+        plt.imshow(mi.util.convert_to_bitmap(img))
         plt.draw()
-        
+
     @staticmethod
     def create_base_scene(_size, _offset, _res=512):
 
@@ -105,7 +112,7 @@ class RendererMts3():
         }
 
         return base_scene
-    
+
     @staticmethod
     def create_triangle_mesh(_name, _vertex_positions, _triangle_indices):
 
@@ -271,7 +278,7 @@ class RendererMts3():
             }
         }
 
-    @staticmethod        
+    @staticmethod
     def add_axis_spheres(mi_scene, _offset):
 
         mi_scene['sphere_x'] = {
@@ -314,7 +321,7 @@ class RendererMts3():
 
     @staticmethod
     def test_sun():
-        
+
         fig,ax = plt.subplots(1,1)
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
@@ -323,11 +330,11 @@ class RendererMts3():
         for i in range(6, 20):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
-            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)        
+            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
             mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
-            RendererMts3.add_axis_spheres(mi_scene, [0,0,0])        
+            RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
             scene = mi.load_dict(mi_scene)
             img = mi.render(scene)
-            im.set_data(mi.util.convert_to_bitmap(img))     
+            im.set_data(mi.util.convert_to_bitmap(img))
             fig.canvas.draw_idle()
             plt.pause(1)

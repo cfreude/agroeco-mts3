@@ -1,15 +1,20 @@
-import os, logging
+import os, logging, time
 from RendererMts3 import RendererMts3
 
 def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False):
     
+    start = time.perf_counter_ns()
+
     renderer = RendererMts3(_verbose)
     renderer.load_path(_path, _lat, _long, _datetime_str)
     measurements = renderer.render(_ray_count)
 
     out_path = os.path.splitext(os.path.split(_path)[-1])[0] +'.irrbin'
     measurements.tofile(out_path)
-    print('Irradiance (binary, type: %s) file saved to: %s' % (measurements.dtype,out_path))
+
+    dur = time.perf_counter_ns() - start
+
+    print(f'Irradiance (binary, type: {measurements.dtype}) file saved to: {out_path} ... dur.: {dur / 1e9:.2f} sec.')
     
     #logging.debug(measurements)
     
