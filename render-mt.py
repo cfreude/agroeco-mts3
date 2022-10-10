@@ -19,6 +19,8 @@ from functools import partial
 from itertools import repeat
 from multiprocessing import Pool, freeze_support
 
+default_ground_size = 1e6 #100 km
+
 def create_base_scene(_size, _offset, _res=512):
 
     base_scene = {
@@ -42,18 +44,21 @@ def create_base_scene(_size, _offset, _res=512):
             'sampler_id': {
                 'type': 'independent',
                 'sample_count': 128
-            } 
-        } 
+            }
+        }
     }
 
     base_scene['ground'] = {
         'type': 'disk',
         'to_world': mi.ScalarTransform4f.translate(_offset).scale([_size, _size, _size]),
-        'material': {
-            'type': 'diffuse',
-            'reflectance': {
-                'type': 'rgb',
-                'value': [0.5, 0.5, 0.5]
+        'naterial': {
+            'type': 'twosided',
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
+                }
             }
         }
     }
@@ -71,9 +76,9 @@ def get_sun(_direction, _power):
     }
 
 def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _id):
-    
+
     vertex_pos = mi.TensorXf(_vertex_positions)
-    face_indices = mi.TensorXu(_triangle_indices) 
+    face_indices = mi.TensorXu(_triangle_indices)
 
     props = mi.Properties()
     if 0:
@@ -90,7 +95,7 @@ def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _id):
                 'type': 'rgb',
                 'value': [1, 0, 0],
                 }
-            })        
+            })
         props["mesh_bsdf"] = bsdf
         #props["mesh_emitter"] = emitter
 
@@ -114,8 +119,8 @@ def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _id):
     tmp_file_name = os.path.join(tmp_path, "%s-%d.ply" % (_name, _id))
     mesh.write_ply(tmp_file_name)
     mesh = mi.load_dict({
-        "type": "ply", 
-        "filename": tmp_file_name, 
+        "type": "ply",
+        "filename": tmp_file_name,
         "bsdf": {'type': 'diffuse',
             'reflectance': {
             'type': 'rgb',
@@ -130,7 +135,7 @@ def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _id):
         #        },
         #}
         'sensor': {
-            'type': 'irradiancemeter',               
+            'type': 'irradiancemeter',
             'sampler': {
                 'type': 'independent',
                 'sample_count': 128
@@ -152,14 +157,14 @@ def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _id):
 def extract_triangle_data(_vertex_positions, _triangle_indices):
     shape = _triangle_indices.shape
     index_map = {}
-    triangle_vertex_positions = []    
+    triangle_vertex_positions = []
     triangle_indices = []
     new_ind = 0
     for ind in np.ravel(_triangle_indices):
         if ind in index_map:
             triangle_indices.append(index_map[ind])
         else:
-            triangle_vertex_positions.append(_vertex_positions[ind])            
+            triangle_vertex_positions.append(_vertex_positions[ind])
             triangle_indices.append(new_ind)
             index_map[ind] = new_ind
             new_ind +=1
@@ -174,12 +179,12 @@ def load_sim_scene(_scene_data, _id):
 
     objects = _scene_data['entities']
     vertex_positions = np.array(_scene_data['pointArray'])
-    
+
     # rotate 90 around X
-    vertex_positions = vertex_positions[:, [0, 2, 1]]    
-    vertex_positions[:, 1] *= -1.0       
+    vertex_positions = vertex_positions[:, [0, 2, 1]]
+    vertex_positions[:, 1] *= -1.0
     logging.debug('Average vertex position: %s', np.average(vertex_positions, axis=0))
-           
+
     for objk, surfaces in objects.items():
         for surfk, tindices in surfaces.items():
             surface_name = '%s-%s' % (objk, surfk)
@@ -240,16 +245,16 @@ def get_sun_direction( _lat, _long, _datetime_str):
 
     if 0:
         print(date)
-        print(date.date())    
+        print(date.date())
         print(date.time())
-        print(date.timetz())    
-        print(date.utcoffset())    
+        print(date.timetz())
+        print(date.utcoffset())
         print(date.tzname())
         print(date.timetuple())
-        
+
     azimut, altitude = get_azimuth(_lat, _long, date), get_altitude(_lat, _long, date)
 
-    logging.debug("Date: %s, azimut: %f, altitude: %f", date, azimut, altitude)   
+    logging.debug("Date: %s, azimut: %f, altitude: %f", date, azimut, altitude)
 
     azimut_in_rad = rad(azimut)
     x, y = np.sin(azimut_in_rad), np.cos(azimut_in_rad)
@@ -258,16 +263,16 @@ def get_sun_direction( _lat, _long, _datetime_str):
     return [x, y, z]
 
 def render(_id, _index_range, sim_scene, _lat, _long, _datetime_str, _ray_count, _verbose):
-        
+
     logging.info('Mitsuba3 - available variants: %s', mi.variants())
 
     offset = [5, -5, 0]
 
-    mi_scene = create_base_scene(5.0, offset, 512)
+    mi_scene = create_base_scene(default_ground_size, offset, 512)
     sun_direction = get_sun_direction(_lat, _long, _datetime_str)
 
     mi_scene['sun'] = get_sun(sun_direction, 1000.0)
-    
+
     sim_objects = load_sim_scene(sim_scene, _id)
     mi_scene = {**mi_scene, **sim_objects}
 
@@ -296,23 +301,23 @@ def render(_id, _index_range, sim_scene, _lat, _long, _datetime_str, _ray_count,
     #time_sum = 0
     measurements = []
     for i in _index_range:
-        start = time.perf_counter_ns()    
+        start = time.perf_counter_ns()
         img = mi.render(scene, sensor=i+1, spp=_ray_count, seed=i)
-        measurements.append(img.array)            
+        measurements.append(img.array)
         #time_sum += time.perf_counter_ns() - start
 
     measurements = np.sum(np.array(measurements), axis=1)
     return measurements
 
 def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False):
-        
+
     sim_scene = load(_path, _verbose)
     obj_count = 0
     for ek, ev in sim_scene['entities'].items():
-        obj_count += len(ev.keys())   
+        obj_count += len(ev.keys())
 
     cpu_count = os.cpu_count()
-    print(cpu_count, obj_count)    
+    print(cpu_count, obj_count)
     a_args = np.array_split(np.arange(obj_count), cpu_count)
     a_args = [(id, x.tolist(), sim_scene, _lat, _long, _datetime_str, _ray_count, _verbose) for id, x in enumerate(a_args)]
     with Pool() as pool:
@@ -323,14 +328,14 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
 
     out_path = os.path.splitext(os.path.split(_path)[-1])[0]
     measurements.tofile(out_path+'.irrbin')
-    
+
     #logging.debug(measurements)
 
     if _show_render:
         img = mi.render(scene)
         plt.figure()
         plt.axis("off")
-        plt.imshow(mi.util.convert_to_bitmap(img))      
+        plt.imshow(mi.util.convert_to_bitmap(img))
         plt.show()
 
 
@@ -358,22 +363,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Irradaince measurment tool based on Mitsuba 3.')
     parser.add_argument('scene_path', type=str, help='Path of the simulation scene file.')
     parser.add_argument('lat', type=float, help='Latitude of the simulation location.')
-    parser.add_argument('long', type=float, help='Longitude of the simulation location.')    
-    parser.add_argument('datetime_str', type=str, help='Time of day - should be in %Y-%m-%dT%H:%M:%S%z format')    
-    parser.add_argument('--ray_count', type=int, default=128, help='Number of rays per element.')    
+    parser.add_argument('long', type=float, help='Longitude of the simulation location.')
+    parser.add_argument('datetime_str', type=str, help='Time of day - should be in %Y-%m-%dT%H:%M:%S%z format')
+    parser.add_argument('--ray_count', type=int, default=128, help='Number of rays per element.')
     parser.add_argument('--verbose', type=bool, default=False, help='Number of rays per element.')
 
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.INFO)        
+        logging.basicConfig(level=logging.INFO)
         #logging.basicConfig(level=logging.DEBUG)
     else:
         #sys.stdout = open(os.devnull, "w")
-        #sys.stderr = open(os.devnull, "w")        
+        #sys.stderr = open(os.devnull, "w")
         #mi.set_log_level(mi.LogLevel.Error)
         logging.basicConfig(level=logging.ERROR)
-        
+
     logging.debug('Args: %s', args)
     main(args.scene_path, args.lat, args.long, args.datetime_str, args.ray_count, _show_render=False)
     logging.info('dur.: %.3f sec.' % ((time.perf_counter_ns()-start) * 1e-9))

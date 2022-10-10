@@ -16,6 +16,8 @@ mi.set_variant("scalar_rgb")
 
 from mitsuba import ScalarTransform4f as T
 
+default_ground_size = 1e6 #100 km
+
 class RendererMts3():
 
     def __init__(self, _verbose=False) -> None:
@@ -26,7 +28,7 @@ class RendererMts3():
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
 
         offset = [5, -5, 0]
-        self.mi_base_scene = RendererMts3.create_base_scene(5.0, offset, 512)
+        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, offset, 512)
 
     def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
@@ -102,11 +104,15 @@ class RendererMts3():
         base_scene['ground'] = {
             'type': 'disk',
             'to_world': mi.ScalarTransform4f.translate(_offset).scale([_size, _size, _size]),
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            'material':
+            {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
         }
@@ -122,10 +128,14 @@ class RendererMts3():
         props = mi.Properties()
         if 0:
             bsdf = mi.load_dict({
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [1, 0, 0]
+                'type': 'twosided',
+                'material':
+                {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [1, 0, 0]
+                        }
                     }
                 })
             emitter = mi.load_dict({
@@ -160,10 +170,14 @@ class RendererMts3():
         mesh = mi.load_dict({
             "type": "ply",
             "filename": tmp_file_name,
-            "bsdf": {'type': 'diffuse',
-                'reflectance': {
-                'type': 'rgb',
-                'value': [0.5, 0.5, 0.5]
+            "bsdf": {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             },
             #'emitter': {
@@ -326,7 +340,7 @@ class RendererMts3():
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
 
-        mi_scene = RendererMts3.create_base_scene(5.0, [0,0,0], 512)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, [0,0,0], 512)
         for i in range(6, 20):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
