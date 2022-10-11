@@ -65,12 +65,16 @@ class RendererMts3():
             measurements.append(1.0)
         return np.array(measurements)
 
-    def show_render(self):
-        img = mi.render(self.mi_scene)
-        plt.figure()
-        plt.axis("off")
-        plt.imshow(mi.util.convert_to_bitmap(img*0.01))
-        plt.show()
+    def show_render(self, _ray_count=0, _show=True, _save=''):
+        img = mi.render(self.mi_scene, spp=_ray_count)
+        if (len(_save)):
+            mi.util.write_bitmap(_save, img)
+        if _show:
+            plt.figure()
+            plt.axis("off")
+            plt.imshow(mi.util.convert_to_bitmap(img*0.01))
+            plt.savefig('result.png', format='png')
+            plt.show()
 
     @staticmethod
     def create_base_scene(_size, _res=512, _camera_distance = 5.0):
@@ -99,19 +103,41 @@ class RendererMts3():
                 }
             }
         }
-        
-        base_scene['ground'] = {
+
+        base_scene['ground_top'] = {
             'type': 'disk',
-            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
-            'material':
-            {
-                'type': 'twosided',
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], -90.0), # Y up
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
+                }
+            }
+        }
+
+        base_scene['ground_bottom'] = {
+            'type': 'disk',
+            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], 90.0).translate([0, -10, 0]), # Y up
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
+                }
+            }
+        }
+
+        base_scene['ground_side'] = {
+            'type': 'cylinder',
+            'radius': _size,
+            'p0': [0, -10, 0],
+            'p1': [0, 0, 0],
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
         }
