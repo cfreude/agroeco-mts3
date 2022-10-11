@@ -36,6 +36,7 @@ def load_path(_path, _verbose=False, _return_binary=False):
 def load_binary(binary_array, _verbose=False):
     """
     #INDEXED DATA
+    uint8 version
     uint32 entitiesCount
         #foreach ENTITY
         uint32 surfacesCount
@@ -55,6 +56,8 @@ def load_binary(binary_array, _verbose=False):
 
     scene = {}
     i = 0
+    [version] = struct.unpack('B', binary_array[i:i+1]); i+=1 # uint8
+
     [entitiesCount] = struct.unpack('I', binary_array[i:i+4]); i+=4 # uint32
     #scene['entitiesCount'] = entitiesCount
     scene['entities'] = {}
