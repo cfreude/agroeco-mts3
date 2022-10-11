@@ -71,7 +71,7 @@ class RendererMts3():
         plt.figure()
         plt.axis("off")
         plt.imshow(mi.util.convert_to_bitmap(img))
-        plt.draw()
+        plt.show()
 
     @staticmethod
     def create_base_scene(_size, _offset, _res=512):
