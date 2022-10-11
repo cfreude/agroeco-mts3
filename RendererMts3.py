@@ -27,8 +27,7 @@ class RendererMts3():
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
 
-        offset = [5, -5, 0]
-        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, offset, 512)
+        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, 512)
 
     def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
@@ -70,11 +69,11 @@ class RendererMts3():
         img = mi.render(self.mi_scene)
         plt.figure()
         plt.axis("off")
-        plt.imshow(mi.util.convert_to_bitmap(img))
+        plt.imshow(mi.util.convert_to_bitmap(img*0.01))
         plt.show()
 
     @staticmethod
-    def create_base_scene(_size, _offset, _res=512):
+    def create_base_scene(_size, _res=512, _camera_distance = 5.0):
 
         base_scene = {
             'type': 'scene',
@@ -85,9 +84,9 @@ class RendererMts3():
                 'type': 'perspective',
                 'fov': 70,
                 'to_world': mi.ScalarTransform4f.look_at(
-                    origin=[_offset[0], _offset[1]-_size*2, _offset[2]+_size],
-                    target=_offset,
-                    up=[0, 0, 1]),
+                    origin=[0, _camera_distance, _camera_distance*2], # Y up
+                    target=[0, 0, 0],
+                    up=[0, 1, 0]), # Y up
                 'film_base': {
                     'type': 'hdrfilm',
                     'pixel_format': 'rgba',
@@ -100,10 +99,10 @@ class RendererMts3():
                 }
             }
         }
-
+        
         base_scene['ground'] = {
             'type': 'disk',
-            'to_world': mi.ScalarTransform4f.translate(_offset).scale([_size, _size, _size]),
+            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
             'material':
             {
                 'type': 'twosided',
@@ -236,8 +235,8 @@ class RendererMts3():
         vertex_positions = np.array(_scene_data['pointArray'])
 
         # rotate 90 around X
-        vertex_positions = vertex_positions[:, [0, 2, 1]]
-        vertex_positions[:, 1] *= -1.0
+        #vertex_positions = vertex_positions[:, [0, 2, 1]]
+        #vertex_positions[:, 1] *= -1.0
         logging.debug('Average vertex position: %s', np.average(vertex_positions, axis=0))
 
         for objk, surfaces in objects.items():
@@ -276,8 +275,8 @@ class RendererMts3():
         logging.debug("Date: %s, azimut: %f, altitude: %f", date, azimut, altitude)
 
         azimut_in_rad = rad(azimut)
-        y, x = np.sin(azimut_in_rad), np.cos(azimut_in_rad)
-        z = np.sin(altitude * deg2rad)
+        z, x = -np.sin(azimut_in_rad), np.cos(azimut_in_rad)
+        y = np.sin(altitude * deg2rad)
 
         return [x, y, z]
 
@@ -340,7 +339,7 @@ class RendererMts3():
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
 
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, [0,0,0], 512)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512)
         for i in range(6, 20):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
@@ -351,4 +350,4 @@ class RendererMts3():
             img = mi.render(scene)
             im.set_data(mi.util.convert_to_bitmap(img))
             fig.canvas.draw_idle()
-            plt.pause(1)
+            plt.pause(0.1)
