@@ -139,7 +139,7 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
                     float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     """
 
-    raise NotImplemented
+    raise NotImplementedError 
 
     scene = {}
     i = _offset
