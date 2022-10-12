@@ -57,6 +57,8 @@ foreach POINT
 ```
 Plants correspond to entities. The surfaces are typically light-sensitive plant organs like leafs. Each surface should be associated with a sensor that measures the irradiance exposure (summed all over the surface). Each surface is represented as a set of triangles which are given by vertex indices. After the section with entities, a list of vertices with 3D coordinates is provided.
 
+Per convention the up-direction is defined +Y and noth is -Z. 
+
 **Result irradiance data format**
 The resulting irradiances per surface need to be sent back as a simple array of floats preserving the order of the surfaces in the request.
 
