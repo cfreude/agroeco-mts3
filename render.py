@@ -1,8 +1,8 @@
 import os, logging, time
 from RendererMts3 import RendererMts3
 
-def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False):
-    
+def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False, _save_render=''):
+
     start = time.perf_counter_ns()
 
     renderer = RendererMts3(_verbose)
@@ -15,12 +15,11 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
     dur = time.perf_counter_ns() - start
 
     print(f'Irradiance (binary, type: {measurements.dtype}) file saved to: {out_path} ... dur.: {dur / 1e9:.2f} sec.')
-    
-    #logging.debug(measurements)
-    
-    if _show_render:
-        renderer.show_render()
 
+    #logging.debug(measurements)
+
+    if _show_render or len(_save_render) > 0:
+        renderer.show_render(_ray_count, _show_render, _save_render)
 
 if __name__ == "__main__":
 
@@ -45,15 +44,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Irradaince measurment tool based on Mitsuba 3.')
     parser.add_argument('scene_path', type=str, help='Path of the simulation scene file.')
     parser.add_argument('lat', type=float, help='Latitude of the simulation location.')
-    parser.add_argument('long', type=float, help='Longitude of the simulation location.')    
-    parser.add_argument('datetime_str', type=str, help='Date and time - should be in %Y-%m-%dT%H:%M:%S%z format')    
-    parser.add_argument('--ray_count', type=int, default=128, help='Number of rays per element.')    
+    parser.add_argument('long', type=float, help='Longitude of the simulation location.')
+    parser.add_argument('datetime_str', type=str, help='Date and time - should be in %Y-%m-%dT%H:%M:%S%z format')
+    parser.add_argument('--ray_count', type=int, default=128, help='Number of rays per element.')
     parser.add_argument('--verbose', type=bool, default=False, help='Number of rays per element.')
 
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.INFO)   
+        logging.basicConfig(level=logging.INFO)
         #logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.ERROR)
