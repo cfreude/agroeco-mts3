@@ -118,7 +118,7 @@ class RendererMts3():
 
         base_scene['ground_bottom'] = {
             'type': 'disk',
-            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], 90.0).translate([0, -10, 0]), # Y up
+            'to_world': mi.ScalarTransform4f.translate([0, -10, 0]).scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
             'material': {
                 'type': 'diffuse',
                 'reflectance': {
