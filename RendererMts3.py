@@ -38,7 +38,7 @@ class RendererMts3():
         self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
 
     def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str) -> None:
-        sim_objects = RendererMts3.load_sim_scene(_scene_dict)
+        sim_objects, stats = RendererMts3.load_sim_scene(_scene_dict)
 
         merged_scene = {**self.mi_base_scene, **sim_objects}
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
@@ -260,10 +260,10 @@ class RendererMts3():
         objects = _scene_data['entities']
         vertex_positions = np.array(_scene_data['pointArray'])
 
-        # rotate 90 around X
-        #vertex_positions = vertex_positions[:, [0, 2, 1]]
-        #vertex_positions[:, 1] *= -1.0
-        logging.debug('Average vertex position: %s', np.average(vertex_positions, axis=0))
+        avgv = np.average(vertex_positions, axis=0)
+        minv = np.min(vertex_positions, axis=0)
+        maxv = np.max(vertex_positions, axis=0)
+        logging.debug(f'Vertex position statistics: min={minv}, avg={avgv}, max={maxv}')
 
         for objk, surfaces in objects.items():
             for surfk, tindices in surfaces.items():
@@ -273,7 +273,7 @@ class RendererMts3():
                 surface_vertices, surface_triangle_indices = RendererMts3.extract_triangle_data(vertex_positions, triangle_indices)
                 mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices)
                 mi_scene[surface_name] = mesh
-        return mi_scene
+        return mi_scene, (minv, avgv, maxv)
 
     @staticmethod
     def get_sun_direction( _lat, _long, _datetime_str):
