@@ -318,6 +318,14 @@ class RendererMts3():
         }
 
     @staticmethod
+    def get_sky(_power):
+        return {
+            'type': 'envmap',
+            'filename': "./data/stuttgart_hillside_4k.exr",
+            'scale': _power,            
+        }
+
+    @staticmethod
     def add_axis_spheres(mi_scene, _offset):
 
         mi_scene['sphere_x'] = {
@@ -373,6 +381,52 @@ class RendererMts3():
             mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
             RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
             scene = mi.load_dict(mi_scene)
+            img = mi.render(scene)
+            im.set_data(mi.util.convert_to_bitmap(img))
+            fig.canvas.draw_idle()
+            plt.pause(0.1)
+
+    @staticmethod
+    def test_sun_optimized():
+
+        fig,ax = plt.subplots(1,1)
+        image = np.array(np.zeros((256, 256, 3)))
+        im = ax.imshow(image)
+                
+        datetime_str = '2022-08-23T%00d:00:00+02:00' % 0
+        sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
+        sun_dir = np.array([v*-1.0 for v in sun_direction])
+        sun_dir /= np.linalg.norm(sun_dir)
+        sun_dir = sun_dir.tolist()
+
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512)
+        mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
+        mi_scene['sky'] = RendererMts3.get_sky(20.0)
+        RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
+        
+
+        up = np.array([0, 1, 0])
+        scene = mi.load_dict(mi_scene)
+        params = mi.traverse(scene)
+        print(params)
+        up_ = mi.coordinate_system(mi.scalar_rgb.Point3f(mi.Vector3f(sun_dir)))
+        print(up)
+        print(T.look_at([0,0,0], sun_dir, [0,1,0]))
+        print(params['sun.to_world']) 
+        print(params['sun.irradiance.value'])       
+        print(params['sky.scale'])
+        quit()
+
+        for i in range(6, 20):
+            datetime_str = '2022-08-23T%00d:00:00+02:00' % i
+            print(datetime_str)
+            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
+            dot_scaler = np.max(0, np.dot(up, sun_direction))
+            sun_power = dot_scaler * 100.0
+            sky_power = dot_scaler * 20
+
+
+
             img = mi.render(scene)
             im.set_data(mi.util.convert_to_bitmap(img))
             fig.canvas.draw_idle()
