@@ -14,7 +14,7 @@ import binary_loader
 #mi.set_variant("llvm_ad_rgb")
 mi.set_variant("scalar_rgb")
 
-from mitsuba import ScalarTransform4f as T
+from mitsuba import PositionSample3f, ScalarTransform4f as T, SurfaceInteraction3f
 
 default_ground_size = 1e6 #100 km
 
@@ -77,7 +77,7 @@ class RendererMts3():
             plt.show()
 
     @staticmethod
-    def create_base_scene(_size, _res=512, _camera_distance = 5.0):
+    def create_base_scene(_size, _res=512, _spp=128, _camera_distance=5.0):
 
         base_scene = {
             'type': 'scene',
@@ -99,7 +99,7 @@ class RendererMts3():
                 },
                 'sampler_id': {
                     'type': 'independent',
-                    'sample_count': 128
+                    'sample_count': _spp
                 }
             }
         }
@@ -312,7 +312,7 @@ class RendererMts3():
             'type': 'directional',
             'direction':  [v*-1.0 for v in _direction],
             'irradiance': {
-                'type': 'spectrum',
+                'type': 'rgb',
                 'value': _power,
             }
         }
@@ -373,7 +373,7 @@ class RendererMts3():
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
 
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512, 16)
         for i in range(6, 20):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
@@ -395,37 +395,47 @@ class RendererMts3():
                 
         datetime_str = '2022-08-23T%00d:00:00+02:00' % 0
         sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
-        sun_dir = np.array([v*-1.0 for v in sun_direction])
-        sun_dir /= np.linalg.norm(sun_dir)
-        sun_dir = sun_dir.tolist()
-
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512)
-        mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
-        mi_scene['sky'] = RendererMts3.get_sky(20.0)
-        RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
         
-
-        up = np.array([0, 1, 0])
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512, 16)
+        mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
+        #mi_scene['sky'] = RendererMts3.get_sky(20.0)
+        RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
+                
         scene = mi.load_dict(mi_scene)
         params = mi.traverse(scene)
+
+        '''
         print(params)
-        up_ = mi.coordinate_system(mi.scalar_rgb.Point3f(mi.Vector3f(sun_dir)))
-        print(up)
-        print(T.look_at([0,0,0], sun_dir, [0,1,0]))
-        print(params['sun.to_world']) 
-        print(params['sun.irradiance.value'])       
+        print('#########')
+        print(params['sun.to_world'])         
+        print(params['sun.irradiance.value'])         
         print(params['sky.scale'])
-        quit()
+        '''
+        
+        world_up = [0.0, 1.0, 0.0]
 
         for i in range(6, 20):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
             sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
-            dot_scaler = np.max(0, np.dot(up, sun_direction))
+
+            _dot = np.dot(world_up, sun_direction)
+            dot_scaler = np.max([0.0, _dot])
+                
             sun_power = dot_scaler * 100.0
-            sky_power = dot_scaler * 20
+            sky_power = dot_scaler * 20.0
 
+            #print('sun_power:', sun_power)            
+            #print('sky_power:', sky_power)
 
+            dn = np.linalg.norm(sun_direction)
+            direction = [-v / dn for v in sun_direction]
+            up_coord, _ = mi.coordinate_system(direction)
+            params['sun.to_world'] = T.look_at([0,0,0], direction, up_coord)
+            params['sun.irradiance.value'] = [sun_power]*3
+            #params['sky.scale'] = sky_power
+
+            params.update();
 
             img = mi.render(scene)
             im.set_data(mi.util.convert_to_bitmap(img))
