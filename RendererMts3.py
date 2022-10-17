@@ -26,8 +26,9 @@ class RendererMts3():
         self.verbose = _verbose
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
-
-        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, 512)
+        
+        origin, target = RendererMts3.get_camera(2.0, 4.0)
+        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
 
     def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
@@ -38,8 +39,13 @@ class RendererMts3():
         self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
 
     def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str) -> None:
-        sim_objects, stats, sensor_count = RendererMts3.load_sim_scene(_scene_dict)
+        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict)
+        logging.debug("Scene statistics:", minv, avgv, maxv)
         logging.debug("Sensor count: %d", sensor_count)
+
+        diag = np.linalg.norm(maxv-minv)
+        origin, target = RendererMts3.get_camera(maxv[1], diag*0.5, _scene_center = avgv.tolist())
+        self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
 
         merged_scene = {**self.mi_base_scene, **sim_objects}
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
@@ -75,7 +81,7 @@ class RendererMts3():
             plt.show()
 
     @staticmethod
-    def create_base_scene(_size, _res=512, _spp=128, _camera_distance=5.0):
+    def create_base_scene(_size, _res=512, _spp=128, _cam_origin=[0,1,1], _cam_target=[0,0,0]):
 
         base_scene = {
             'type': 'scene',
@@ -86,8 +92,8 @@ class RendererMts3():
                 'type': 'perspective',
                 'fov': 70,
                 'to_world': mi.ScalarTransform4f.look_at(
-                    origin=[0, _camera_distance, _camera_distance*2], # Y up
-                    target=[0, 0, 0],
+                    origin=_cam_origin,
+                    target=_cam_target,
                     up=[0, 1, 0]), # Y up
                 'film_base': {
                     'type': 'hdrfilm',
@@ -362,13 +368,20 @@ class RendererMts3():
         return mi_scene
 
     @staticmethod
+    def get_camera(_height, _distance, _scene_center=[0,0,0]):
+        origin = np.array([0, _height, _distance]) + np.array(_scene_center)       
+        target = _scene_center
+        return origin.tolist(), target
+
+    @staticmethod
     def test_sun():
 
         fig,ax = plt.subplots(1,1)
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
-
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512, 16)
+        
+        origin, target = RendererMts3.get_camera(2.0, 4.0)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
         for i in range(6, 20):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
@@ -391,7 +404,8 @@ class RendererMts3():
         datetime_str = '2022-08-23T%00d:00:00+02:00' % 0
         sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
         
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512, 16)
+        origin, target = RendererMts3.get_camera(2.0, 4.0)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
         mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
         #mi_scene['sky'] = RendererMts3.get_sky(20.0)
         RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
