@@ -38,15 +38,13 @@ class RendererMts3():
         self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
 
     def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str) -> None:
-        sim_objects, stats = RendererMts3.load_sim_scene(_scene_dict)
+        sim_objects, stats, sensor_count = RendererMts3.load_sim_scene(_scene_dict)
+        logging.debug("Sensor count: %d", sensor_count)
 
         merged_scene = {**self.mi_base_scene, **sim_objects}
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
         merged_scene['sun'] = RendererMts3.get_sun(sun_direction, 1000.0)
         #merged_scene['sun'] = get_sun([0, -1, 0], 1000.0)
-
-        sensor_count = len(sim_objects.keys())
-        logging.debug("Sensor count: %d", sensor_count)
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
@@ -145,33 +143,16 @@ class RendererMts3():
         return base_scene
 
     @staticmethod
-    def create_triangle_mesh(_name, _vertex_positions, _triangle_indices):
+    def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _spp=0):
+
+        #print(_name)
+        #print(_vertex_positions)
+        #print(_triangle_indices)
 
         vertex_pos = mi.TensorXf(_vertex_positions)
         face_indices = mi.TensorXu(_triangle_indices)
 
         props = mi.Properties()
-        if 0:
-            bsdf = mi.load_dict({
-                'type': 'twosided',
-                'material':
-                {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [1, 0, 0]
-                        }
-                    }
-                })
-            emitter = mi.load_dict({
-                'type': 'area',
-                'radiance': {
-                    'type': 'rgb',
-                    'value': [1, 0, 0],
-                    }
-                })
-            props["mesh_bsdf"] = bsdf
-            #props["mesh_emitter"] = emitter
 
         mesh = mi.Mesh(
             _name,
@@ -192,7 +173,10 @@ class RendererMts3():
 
         tmp_file_name = os.path.join(tmp_path, "%s.ply" % _name)
         mesh.write_ply(tmp_file_name)
-        mesh = mi.load_dict({
+
+        del mesh
+
+        ply = {
             "type": "ply",
             "filename": tmp_file_name,
             "bsdf": {
@@ -204,19 +188,15 @@ class RendererMts3():
                         'value': [0.5, 0.5, 0.5]
                     }
                 }
-            },
-            #'emitter': {
-            #    'type': 'area',
-            #    'radiance': {
-            #        'type': 'rgb',
-            #        'value': [10, 0, 0],
-            #        },
-            #}
-            'sensor': {
+            }
+        }
+
+        if _spp > 0:
+            ply['sensor'] = {
                 'type': 'irradiancemeter',
                 'sampler': {
                     'type': 'independent',
-                    'sample_count': 128
+                    'sample_count': _spp
                 },
                 'film': {
                     'type': 'hdrfilm',
@@ -228,7 +208,8 @@ class RendererMts3():
                     'pixel_format': 'rgb',
                 },
             }
-        })
+
+        mesh = mi.load_dict(ply)
 
         return mesh
 
@@ -253,18 +234,31 @@ class RendererMts3():
         return triangle_vertex_positions, triangle_indices
 
     @staticmethod
-    def load_sim_scene(_scene_data):
+    def load_sim_scene(_scene_data, _spp=128):
 
         mi_scene = {}
 
-        objects = _scene_data['entities']
         vertex_positions = np.array(_scene_data['pointArray'])
-
         avgv = np.average(vertex_positions, axis=0)
         minv = np.min(vertex_positions, axis=0)
         maxv = np.max(vertex_positions, axis=0)
         logging.debug(f'Vertex position statistics: min={minv}, avg={avgv}, max={maxv}')
+        
+        # add sensors
+        sensor_count = 0
+        objects = _scene_data['sensors']
+        for objk, surfaces in objects.items():
+            for surfk, tindices in surfaces.items():
+                surface_name = '%s-%s' % (objk, surfk)
+                #print(surface_name)
+                triangle_indices = np.array(tindices)
+                surface_vertices, surface_triangle_indices = RendererMts3.extract_triangle_data(vertex_positions, triangle_indices)
+                mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices, _spp)
+                mi_scene[surface_name] = mesh
+                sensor_count += 1
 
+        # add obstacles
+        objects = _scene_data['obstacles']
         for objk, surfaces in objects.items():
             for surfk, tindices in surfaces.items():
                 surface_name = '%s-%s' % (objk, surfk)
@@ -273,7 +267,8 @@ class RendererMts3():
                 surface_vertices, surface_triangle_indices = RendererMts3.extract_triangle_data(vertex_positions, triangle_indices)
                 mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices)
                 mi_scene[surface_name] = mesh
-        return mi_scene, (minv, avgv, maxv)
+
+        return mi_scene, (minv, avgv, maxv), sensor_count 
 
     @staticmethod
     def get_sun_direction( _lat, _long, _datetime_str):
