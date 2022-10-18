@@ -46,7 +46,6 @@ def load_binary(binary_array, _verbose=False):
     }
 
     if format in map:
-        print(f'Loading binary format: {format}')
         return map[format](binary_array, _verbose, 1) # offset 1 to skip format byte
     else:
         warn(f"Invalid format: {format}, expected any of {list(map.keys())}, Falling back to format: 1")
@@ -79,6 +78,7 @@ def load_mesh_entities(binary_array, _prefix, i, _verbose=False):
             entities[entity_key][surface_key] = triangle_indices
 
     return entities, i
+
 
 def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     """
@@ -141,19 +141,28 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     return scene
 
 
-def disk(_from, _bin_arr):
+def unpack(_i, _bin_arr, _str, _bytePerType=4, _print_name=None):
+    offset = len(_str) * _bytePerType 
+    val = struct.unpack(_str, _bin_arr[_i:_i+offset])
+    if len(_str) == 1: # extract single value from tuple
+        val = val[0]
+    if _print_name is not None:
+        print(f"{_print_name}: {val} | index: {_i}")
+    return val, _i + offset
+
+
+def disk(_i, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case disk (currently not used)
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-    '''
-    data = {'type': 1}
-    to = _from + 4*12
-    data['matrix'] = struct.unpack('f'*12, _bin_arr[_from:to]);
-    return data, to
+    '''  
+    data = {'type': 1} 
+    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='disk.matrix') 
+    return data, _i
 
 
-def cylinder(_from, _bin_arr):
+def cylinder(_i, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case cylinder
@@ -162,16 +171,13 @@ def cylinder(_from, _bin_arr):
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
     data = {'type': 2}
-    to = _from + 4
-    data['length'] = struct.unpack('f', _bin_arr[_from:to])
-    _from = to; to += 4
-    data['radius'] = struct.unpack('f', _bin_arr[_from:to])
-    _from = to; to += 4*12
-    data['matrix'] = struct.unpack('f'*12, _bin_arr[_from:to])
-    return data, to
+    data['length'], _i = unpack(_i, _bin_arr, 'f', _print_name='cylinder.length')                            
+    data['radius'], _i = unpack(_i, _bin_arr, 'f', _print_name='cylinder.radius')                         
+    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='cylinder.matrix')             
+    return data, _i
 
 
-def sphere(_from, _bin_arr):
+def sphere(_i, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case sphere
@@ -179,23 +185,20 @@ def sphere(_from, _bin_arr):
         float32 radius
     '''
     data = {'type': 4}
-    to = _from + 12
-    data['length'] = struct.unpack('fff', _bin_arr[_from:to])
-    _from = to; to += 4
-    data['radius'] = struct.unpack('f', _bin_arr[_from:to])
-    return data, to
+    data['center'], _i = unpack(_i, _bin_arr, 'fff', _print_name='sphere.center')             
+    data['radius'], _i = unpack(_i, _bin_arr, 'f', _print_name='sphere.radius')               
+    return data, _i
 
 
-def rectangle(_from, _bin_arr):
+def rectangle(_i, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case rectangle
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
-    data = {'type': 8, "_i": _from}
-    to = _from + 4*12
-    data['matrix'] = struct.unpack('f'*12, _bin_arr[_from:to])
-    return data, to
+    data = {'type': 8}
+    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='rectangle.matrix')      
+    return data, _i
 
 
 primitive_map = {
@@ -225,31 +228,22 @@ def load_primitve_entities(binary_array, _prefix, i, _verbose=False):
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
     entities = {}
-    [entitiesCount] = struct.unpack('I', binary_array[i:i+4]); i+=4 # uint32
-    if _verbose:
-        print('entitiesCount:', entitiesCount, '| byte index:', i)
+    entitiesCount, i = unpack(i, binary_array, 'I', _print_name='entitiesCount' if _verbose else None)
     for e in range(entitiesCount):
-        [surfacesCount] = struct.unpack('I', binary_array[i:i+4]); i+=4 # uint32
+        surfacesCount, i = unpack(i, binary_array, 'I', _print_name='surfacesCount' if _verbose else None)
         entity_key = f"{_prefix}-entitiy{e}"
         entities[entity_key] = {}
-        if _verbose:
-            print(entity_key, '| surfacesCount:', surfacesCount, '| byte index:', i)
-        for s in range(surfacesCount):
+        for s in range(surfacesCount):            
             surface_key = f"surface{s}"
-
-            [primitiveType] = struct.unpack('B', binary_array[i:i+1]); i+=1 # uint8
-
-            if _verbose:
-                print(surface_key, '| primitiveType:', primitiveType, '| byte index:', i)
-
+            primitiveType, i = unpack(i, binary_array, 'B', 1, _print_name='primitiveType' if _verbose else None)
             data, i = primitive_map[primitiveType](i, binary_array)
-            print(data, '| byte index:', i)
+            #print(data, '| byte index:', i)
             entities[entity_key][surface_key] = data
 
     return entities, i
 
 def load_binary_primitives(binary_array, _verbose=False, _offset=0):
-
+    
     # ROW MAJOR MATRICES
     """
     uint8 version = 2
@@ -288,15 +282,15 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
             #case rectangle
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     """
-
+    
     scene = {}
     i = _offset
-    scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)
-    scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)
-
+    scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)    
+    scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)    
+    
     if _verbose:
         pprint(scene)
-
-    raise NotImplementedError
+        
+    raise NotImplementedError 
 
     return scene
