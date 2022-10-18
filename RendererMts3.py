@@ -14,7 +14,7 @@ import binary_loader
 #mi.set_variant("llvm_ad_rgb")
 mi.set_variant("scalar_rgb")
 
-from mitsuba import ScalarTransform4f as T
+from mitsuba import PositionSample3f, ScalarTransform4f as T, SurfaceInteraction3f
 
 default_ground_size = 1e6 #100 km
 
@@ -26,27 +26,31 @@ class RendererMts3():
         self.verbose = _verbose
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
+        
+        origin, target = RendererMts3.get_camera(2.0, 4.0)
+        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
 
-        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, 512)
-
-    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str) -> None:
+    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
+        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_path(self, _path, _latitude, _longitude, _datetime_str) -> None:
+    def load_path(self, _path, _latitude, _longitude, _datetime_str, _spp) -> None:
         scene_dict = binary_loader.load_path(_path, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
+        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str) -> None:
-        sim_objects, stats = RendererMts3.load_sim_scene(_scene_dict)
-
-        merged_scene = {**self.mi_base_scene, **sim_objects}
-        sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
-        merged_scene['sun'] = RendererMts3.get_sun(sun_direction, 1000.0)
-        #merged_scene['sun'] = get_sun([0, -1, 0], 1000.0)
-
-        sensor_count = len(sim_objects.keys())
+    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp) -> None:
+        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
+        logging.debug("Scene statistics:", minv, avgv, maxv)
         logging.debug("Sensor count: %d", sensor_count)
+
+        diag = np.linalg.norm(maxv-minv)
+        origin, target = RendererMts3.get_camera(maxv[1], diag*0.5, _scene_center = avgv.tolist())
+        self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=_spp, _cam_origin=origin, _cam_target=target)
+
+        sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
+        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+
+        merged_scene = {**self.mi_base_scene, **sun_sky, **sim_objects}
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
@@ -65,19 +69,19 @@ class RendererMts3():
             measurements.append(1.0)
         return np.array(measurements)
 
-    def show_render(self, _ray_count=0, _show=True, _save=''):
+    def show_render(self, _ray_count=128, _show=True, _save=''):
         img = mi.render(self.mi_scene, spp=_ray_count)
         if (len(_save)):
             mi.util.write_bitmap(_save, img)
         if _show:
             plt.figure()
             plt.axis("off")
-            plt.imshow(mi.util.convert_to_bitmap(img*0.01))
+            plt.imshow(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             plt.savefig('result.png', format='png')
             plt.show()
 
     @staticmethod
-    def create_base_scene(_size, _res=512, _camera_distance = 5.0):
+    def create_base_scene(_size, _res=512, _spp=128, _cam_origin=[0,1,1], _cam_target=[0,0,0]):
 
         base_scene = {
             'type': 'scene',
@@ -88,8 +92,8 @@ class RendererMts3():
                 'type': 'perspective',
                 'fov': 70,
                 'to_world': mi.ScalarTransform4f.look_at(
-                    origin=[0, _camera_distance, _camera_distance*2], # Y up
-                    target=[0, 0, 0],
+                    origin=_cam_origin,
+                    target=_cam_target,
                     up=[0, 1, 0]), # Y up
                 'film_base': {
                     'type': 'hdrfilm',
@@ -99,7 +103,7 @@ class RendererMts3():
                 },
                 'sampler_id': {
                     'type': 'independent',
-                    'sample_count': 128
+                    'sample_count': _spp
                 }
             }
         }
@@ -145,33 +149,16 @@ class RendererMts3():
         return base_scene
 
     @staticmethod
-    def create_triangle_mesh(_name, _vertex_positions, _triangle_indices):
+    def create_triangle_mesh(_name, _vertex_positions, _triangle_indices, _spp=0):
+
+        #print(_name)
+        #print(_vertex_positions)
+        #print(_triangle_indices)
 
         vertex_pos = mi.TensorXf(_vertex_positions)
         face_indices = mi.TensorXu(_triangle_indices)
 
         props = mi.Properties()
-        if 0:
-            bsdf = mi.load_dict({
-                'type': 'twosided',
-                'material':
-                {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [1, 0, 0]
-                        }
-                    }
-                })
-            emitter = mi.load_dict({
-                'type': 'area',
-                'radiance': {
-                    'type': 'rgb',
-                    'value': [1, 0, 0],
-                    }
-                })
-            props["mesh_bsdf"] = bsdf
-            #props["mesh_emitter"] = emitter
 
         mesh = mi.Mesh(
             _name,
@@ -192,7 +179,10 @@ class RendererMts3():
 
         tmp_file_name = os.path.join(tmp_path, "%s.ply" % _name)
         mesh.write_ply(tmp_file_name)
-        mesh = mi.load_dict({
+
+        del mesh
+
+        ply = {
             "type": "ply",
             "filename": tmp_file_name,
             "bsdf": {
@@ -204,19 +194,15 @@ class RendererMts3():
                         'value': [0.5, 0.5, 0.5]
                     }
                 }
-            },
-            #'emitter': {
-            #    'type': 'area',
-            #    'radiance': {
-            #        'type': 'rgb',
-            #        'value': [10, 0, 0],
-            #        },
-            #}
-            'sensor': {
+            }
+        }
+
+        if _spp > 0:
+            ply['sensor'] = {
                 'type': 'irradiancemeter',
                 'sampler': {
                     'type': 'independent',
-                    'sample_count': 128
+                    'sample_count': _spp
                 },
                 'film': {
                     'type': 'hdrfilm',
@@ -228,7 +214,8 @@ class RendererMts3():
                     'pixel_format': 'rgb',
                 },
             }
-        })
+
+        mesh = mi.load_dict(ply)
 
         return mesh
 
@@ -253,18 +240,31 @@ class RendererMts3():
         return triangle_vertex_positions, triangle_indices
 
     @staticmethod
-    def load_sim_scene(_scene_data):
+    def load_sim_scene(_scene_data, _spp=128):
 
         mi_scene = {}
 
-        objects = _scene_data['entities']
         vertex_positions = np.array(_scene_data['pointArray'])
-
         avgv = np.average(vertex_positions, axis=0)
         minv = np.min(vertex_positions, axis=0)
         maxv = np.max(vertex_positions, axis=0)
         logging.debug(f'Vertex position statistics: min={minv}, avg={avgv}, max={maxv}')
+        
+        # add sensors
+        sensor_count = 0
+        objects = _scene_data['sensors']
+        for objk, surfaces in objects.items():
+            for surfk, tindices in surfaces.items():
+                surface_name = '%s-%s' % (objk, surfk)
+                #print(surface_name)
+                triangle_indices = np.array(tindices)
+                surface_vertices, surface_triangle_indices = RendererMts3.extract_triangle_data(vertex_positions, triangle_indices)
+                mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices, _spp)
+                mi_scene[surface_name] = mesh
+                sensor_count += 1
 
+        # add obstacles
+        objects = _scene_data['obstacles']
         for objk, surfaces in objects.items():
             for surfk, tindices in surfaces.items():
                 surface_name = '%s-%s' % (objk, surfk)
@@ -273,7 +273,8 @@ class RendererMts3():
                 surface_vertices, surface_triangle_indices = RendererMts3.extract_triangle_data(vertex_positions, triangle_indices)
                 mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices)
                 mi_scene[surface_name] = mesh
-        return mi_scene, (minv, avgv, maxv)
+
+        return mi_scene, (minv, avgv, maxv), sensor_count 
 
     @staticmethod
     def get_sun_direction( _lat, _long, _datetime_str):
@@ -312,10 +313,33 @@ class RendererMts3():
             'type': 'directional',
             'direction':  [v*-1.0 for v in _direction],
             'irradiance': {
-                'type': 'spectrum',
+                'type': 'rgb',
                 'value': _power,
             }
         }
+
+    @staticmethod
+    def get_sky(_power):
+        return {
+            'type': 'envmap',
+            'filename': "./data/stuttgart_hillside_4k.exr",
+            'scale': _power,            
+        }
+
+    @staticmethod
+    def get_sun_sky(_direction, _power=1000.0):
+
+        _dot = np.dot([0,1,0], _direction)
+        dot_scaler = np.max([0.0, _dot])
+                
+        sun_power = dot_scaler * _power * 5.0/6.0 # -1/6 for clowdy sky 
+        sky_power = dot_scaler * 1.0
+
+        scene = {}
+        scene['sun'] = RendererMts3.get_sun(_direction, sun_power)
+        scene['sky'] = RendererMts3.get_sky(sky_power)
+
+        return scene, sun_power, sky_power
 
     @staticmethod
     def add_axis_spheres(mi_scene, _offset):
@@ -359,21 +383,77 @@ class RendererMts3():
         return mi_scene
 
     @staticmethod
+    def get_camera(_height, _distance, _scene_center=[0,0,0]):
+        origin = np.array([0, _height, _distance]) + np.array(_scene_center)       
+        target = _scene_center
+        return origin.tolist(), target
+
+    @staticmethod
     def test_sun():
 
         fig,ax = plt.subplots(1,1)
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
-
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, 512)
-        for i in range(6, 20):
+        
+        origin, target = RendererMts3.get_camera(2.0, 4.0)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
+        for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
             sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
-            mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
+            sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+            mi_scene = {**mi_scene, **sun_sky}
             RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
             scene = mi.load_dict(mi_scene)
             img = mi.render(scene)
-            im.set_data(mi.util.convert_to_bitmap(img))
+            im.set_data(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
+            fig.canvas.draw_idle()
+            plt.pause(0.1)
+
+    @staticmethod
+    def test_sun_optimized():
+
+        fig,ax = plt.subplots(1,1)
+        image = np.array(np.zeros((256, 256, 3)))
+        im = ax.imshow(image)
+                
+        datetime_str = '2022-08-23T%00d:00:00+02:00' % 0
+        sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
+        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+        origin, target = RendererMts3.get_camera(2.0, 4.0)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
+        
+        mi_scene = {**mi_scene, **sun_sky}
+        RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
+                
+        scene = mi.load_dict(mi_scene)
+        params = mi.traverse(scene)
+
+        '''
+        print(params)
+        print('#########')
+        print(params['sun.to_world'])         
+        print(params['sun.irradiance.value'])         
+        print(params['sky.scale'])
+        '''
+        
+        world_up = [0.0, 1.0, 0.0]
+
+        for i in range(6, 21):
+            datetime_str = '2022-08-23T%00d:00:00+02:00' % i
+            print(datetime_str)
+            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)          
+            _, sun_power, sky_power = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+
+            dn = np.linalg.norm(sun_direction)
+            direction = [-v / dn for v in sun_direction]
+            up_coord, _ = mi.coordinate_system(direction)
+            params['sun.to_world'] = T.look_at([0,0,0], direction, up_coord)
+            params['sun.irradiance.value'] = [sun_power]*3
+            params['sky.scale'] = sky_power
+            params.update()
+
+            img = mi.render(scene)
+            im.set_data(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             fig.canvas.draw_idle()
             plt.pause(0.1)
