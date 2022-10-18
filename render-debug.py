@@ -16,7 +16,7 @@ def test_day_cylce():
         avg = np.mean(measurments)   
         h.append(hour)
         val.append(avg)     
-        print(datetime_str, avg)
+        logging.debug(datetime_str, avg)
         hour = (hour + 1) % 24
         day += 1
     
@@ -56,26 +56,32 @@ def test_directional():
         })
 
     params = mi.traverse(scene)
-    print(params['sun.to_world']) 
+    logging.debug(params['sun.to_world']) 
     
     dn = np.linalg.norm(direction)
     direction = [v / dn for v in direction]
     up, _ = mi.coordinate_system(direction)
-    print(T.look_at([0,0,0], direction, up))
+    logging.debug(T.look_at([0,0,0], direction, up))
     
 
 if __name__ == "__main__":
 
+    logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+    FORMAT = '%(name)s :: %(levelname)-8s :: %(message)s'
+    FORMAT = '%(levelname)-8s :: %(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+
     #test_directional(); quit()
     
     # test sun cycle
-    #s = time.perf_counter_ns(); RendererMts3.test_sun(); print('classic', time.perf_counter_ns()-s); quit()
-    #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); print('optimized', time.perf_counter_ns()-s); quit()
+    #s = time.perf_counter_ns(); RendererMts3.test_sun(); logging.debug('classic', time.perf_counter_ns()-s); quit()
+    #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); logging.debug('optimized', time.perf_counter_ns()-s); quit()
     
     # test MESH scene simulation / rendering
-    main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=False, _show_render=True); quit()
+    #main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=False, _show_render=True); quit()
 
     # test PRIMITIVE scene simulation / rendering
+    #main('./data/t78.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
     main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
 
     # test day cycle
