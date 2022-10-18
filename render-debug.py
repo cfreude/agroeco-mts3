@@ -73,7 +73,7 @@ if __name__ == "__main__":
     #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); print('optimized', time.perf_counter_ns()-s); quit()
     
     # test MESH scene simulation / rendering
-    main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _show_render=True); quit()
+    main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=False, _show_render=True); quit()
 
     # test PRIMITIVE scene simulation / rendering
     main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()

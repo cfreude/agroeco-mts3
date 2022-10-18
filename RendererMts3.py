@@ -30,27 +30,27 @@ class RendererMts3():
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
 
-    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str) -> None:
+    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
+        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_path(self, _path, _latitude, _longitude, _datetime_str) -> None:
+    def load_path(self, _path, _latitude, _longitude, _datetime_str, _spp) -> None:
         scene_dict = binary_loader.load_path(_path, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str)
+        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str) -> None:
-        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict)
+    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp) -> None:
+        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
         logging.debug("Scene statistics:", minv, avgv, maxv)
         logging.debug("Sensor count: %d", sensor_count)
 
         diag = np.linalg.norm(maxv-minv)
         origin, target = RendererMts3.get_camera(maxv[1], diag*0.5, _scene_center = avgv.tolist())
-        self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
+        self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
-        merged_scene = {**self.mi_base_scene, **sim_objects}
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
-        merged_scene['sun'] = RendererMts3.get_sun(sun_direction, 1000.0)
-        #merged_scene['sun'] = get_sun([0, -1, 0], 1000.0)
+        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+
+        merged_scene = {**self.mi_base_scene, **sun_sky, **sim_objects}
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
@@ -69,14 +69,14 @@ class RendererMts3():
             measurements.append(1.0)
         return np.array(measurements)
 
-    def show_render(self, _ray_count=0, _show=True, _save=''):
+    def show_render(self, _ray_count=128, _show=True, _save=''):
         img = mi.render(self.mi_scene, spp=_ray_count)
         if (len(_save)):
             mi.util.write_bitmap(_save, img)
         if _show:
             plt.figure()
             plt.axis("off")
-            plt.imshow(mi.util.convert_to_bitmap(img*0.01))
+            plt.imshow(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             plt.savefig('result.png', format='png')
             plt.show()
 
@@ -327,6 +327,21 @@ class RendererMts3():
         }
 
     @staticmethod
+    def get_sun_sky(_direction, _power=1000.0):
+
+        _dot = np.dot([0,1,0], _direction)
+        dot_scaler = np.max([0.0, _dot])
+                
+        sun_power = dot_scaler * _power * 5.0/6.0 # -1/6 for clowdy sky 
+        sky_power = dot_scaler * 1.0
+
+        scene = {}
+        scene['sun'] = RendererMts3.get_sun(_direction, sun_power)
+        scene['sky'] = RendererMts3.get_sky(sky_power)
+
+        return scene, sun_power, sky_power
+
+    @staticmethod
     def add_axis_spheres(mi_scene, _offset):
 
         mi_scene['sphere_x'] = {
@@ -382,15 +397,16 @@ class RendererMts3():
         
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
-        for i in range(6, 20):
+        for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
             sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
-            mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
+            sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+            mi_scene = {**mi_scene, **sun_sky}
             RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
             scene = mi.load_dict(mi_scene)
             img = mi.render(scene)
-            im.set_data(mi.util.convert_to_bitmap(img))
+            im.set_data(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             fig.canvas.draw_idle()
             plt.pause(0.1)
 
@@ -403,11 +419,11 @@ class RendererMts3():
                 
         datetime_str = '2022-08-23T%00d:00:00+02:00' % 0
         sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
-        
+        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
-        mi_scene['sun'] = RendererMts3.get_sun(sun_direction, 100.0)
-        #mi_scene['sky'] = RendererMts3.get_sky(20.0)
+        
+        mi_scene = {**mi_scene, **sun_sky}
         RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
                 
         scene = mi.load_dict(mi_scene)
@@ -423,30 +439,21 @@ class RendererMts3():
         
         world_up = [0.0, 1.0, 0.0]
 
-        for i in range(6, 20):
+        for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             print(datetime_str)
-            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
-
-            _dot = np.dot(world_up, sun_direction)
-            dot_scaler = np.max([0.0, _dot])
-                
-            sun_power = dot_scaler * 100.0
-            sky_power = dot_scaler * 20.0
-
-            #print('sun_power:', sun_power)            
-            #print('sky_power:', sky_power)
+            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)          
+            _, sun_power, sky_power = RendererMts3.get_sun_sky(sun_direction, 1000.0)
 
             dn = np.linalg.norm(sun_direction)
             direction = [-v / dn for v in sun_direction]
             up_coord, _ = mi.coordinate_system(direction)
             params['sun.to_world'] = T.look_at([0,0,0], direction, up_coord)
             params['sun.irradiance.value'] = [sun_power]*3
-            #params['sky.scale'] = sky_power
-
-            params.update();
+            params['sky.scale'] = sky_power
+            params.update()
 
             img = mi.render(scene)
-            im.set_data(mi.util.convert_to_bitmap(img))
+            im.set_data(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             fig.canvas.draw_idle()
             plt.pause(0.1)
