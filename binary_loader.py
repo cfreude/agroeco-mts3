@@ -39,9 +39,9 @@ def load_binary(binary_array, _verbose=False):
 
     if _verbose:
         print(f'binary file format: {format}')
-    
+
     map = {
-        1: load_binary_mesh,        
+        1: load_binary_mesh,
         2: load_binary_primitives,
     }
 
@@ -77,44 +77,52 @@ def load_mesh_entities(binary_array, _prefix, i, _verbose=False):
                 if _verbose:
                     print('index #%d' % t, '| (ind0, ind1, ind2):', index_tripplet, '| byte index:', i)
             entities[entity_key][surface_key] = triangle_indices
-                    
+
     return entities, i
 
 def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     """
-    uint8 version = 1
-    #INDEXED DATA FOR OBSTACLES
+    uint8 version = 2
+    #OBSTACLES
     uint32 entitiesCount
     foreach ENTITY
         uint32 surfacesCount
         foreach SURFACE
-            uint8 trianglesCount
-            foreach TRIANGLE
-                uint32 index0
-                uint32 index1
-                uint32 index2
-    #INDEXED DATA FOR SENSORS
+            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
+            #case disk
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #case cylinder
+            float32 length
+            float32 radius
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #case sphere
+            3xfloat32 center
+            float32 radius
+            #case rectangle
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+    #SENSORS
     uint32 entitiesCount
     foreach ENTITY
         uint32 surfacesCount
         foreach SURFACE
-            uint8 trianglesCount
-            foreach TRIANGLE
-                uint32 index0
-                uint32 index1
-                uint32 index2
-    #POINTS DATA
-    uint32 pointsCount
-        #foreach POINT
-        float32 x
-        float32 y
-        float32 z
+            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
+            #case disk
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #case cylinder
+            float32 length
+            float32 radius
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #case sphere
+            3xfloat32 center
+            float32 radius
+            #case rectangle
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     """
 
     scene = {}
     i = _offset
-    scene['obstacles'], i = load_mesh_entities(binary_array, 'obstacle', i, _verbose)    
-    scene['sensors'], i = load_mesh_entities(binary_array, 'sensor', i, _verbose)   
+    scene['obstacles'], i = load_mesh_entities(binary_array, 'obstacle', i, _verbose)
+    scene['sensors'], i = load_mesh_entities(binary_array, 'sensor', i, _verbose)
     [pointsCount] = struct.unpack('I', binary_array[i:i+4]); i+=4 # uint32
     if _verbose:
         print('pointsCount:', pointsCount, '| byte index:', i)
@@ -133,18 +141,19 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     return scene
 
 
-def disk(_i, _bin_arr):
+def disk(_from, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case disk (currently not used)
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-    '''  
-    data = {'type': 1} 
-    data['matrix'] = struct.unpack('f'*12, _bin_arr[_i:_i+4*12]); _i+=4*12;
-    return data, _i+(4*4*3)
+    '''
+    data = {'type': 1}
+    to = _from + 4*12
+    data['matrix'] = struct.unpack('f'*12, _bin_arr[_from:to]);
+    return data, to
 
 
-def cylinder(_i, _bin_arr):
+def cylinder(_from, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case cylinder
@@ -153,13 +162,16 @@ def cylinder(_i, _bin_arr):
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
     data = {'type': 2}
-    data['length'] = struct.unpack('f', _bin_arr[_i:_i+4]); _i+=4;                
-    data['radius'] = struct.unpack('f', _bin_arr[_i:_i+4]); _i+=4;                
-    data['matrix'] = struct.unpack('f'*12, _bin_arr[_i:_i+4*12]); _i+=4*12;
-    return data, _i+4+4+(4*4*3)
+    to = _from + 4
+    data['length'] = struct.unpack('f', _bin_arr[_from:to])
+    _from = to; to += 4
+    data['radius'] = struct.unpack('f', _bin_arr[_from:to])
+    _from = to; to += 4*12
+    data['matrix'] = struct.unpack('f'*12, _bin_arr[_from:to])
+    return data, to
 
 
-def sphere(_i, _bin_arr):
+def sphere(_from, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case sphere
@@ -167,21 +179,23 @@ def sphere(_i, _bin_arr):
         float32 radius
     '''
     data = {'type': 4}
-    data['length'] = struct.unpack('fff', _bin_arr[_i:_i+4*3]); _i+=4*3;                
-    data['radius'] = struct.unpack('f', _bin_arr[_i:_i+4]); _i+=4;                
-    return data, _i+4+(4*3)
+    to = _from + 12
+    data['length'] = struct.unpack('fff', _bin_arr[_from:to])
+    _from = to; to += 4
+    data['radius'] = struct.unpack('f', _bin_arr[_from:to])
+    return data, to
 
 
-def rectangle(_i, _bin_arr):
+def rectangle(_from, _bin_arr):
     '''
     uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
     #case rectangle
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
-    data = {'type': 8}
-    byte_count = 4*12
-    data['matrix'] = struct.unpack('f'*12, _bin_arr[_i:_i+byte_count]); _i+=byte_count
-    return data, _i+byte_count
+    data = {'type': 8, "_i": _from}
+    to = _from + 4*12
+    data['matrix'] = struct.unpack('f'*12, _bin_arr[_from:to])
+    return data, to
 
 
 primitive_map = {
@@ -220,7 +234,7 @@ def load_primitve_entities(binary_array, _prefix, i, _verbose=False):
         entities[entity_key] = {}
         if _verbose:
             print(entity_key, '| surfacesCount:', surfacesCount, '| byte index:', i)
-        for s in range(surfacesCount):            
+        for s in range(surfacesCount):
             surface_key = f"surface{s}"
 
             [primitiveType] = struct.unpack('B', binary_array[i:i+1]); i+=1 # uint8
@@ -235,7 +249,7 @@ def load_primitve_entities(binary_array, _prefix, i, _verbose=False):
     return entities, i
 
 def load_binary_primitives(binary_array, _verbose=False, _offset=0):
-    
+
     # ROW MAJOR MATRICES
     """
     uint8 version = 2
@@ -274,15 +288,15 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
             #case rectangle
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     """
-    
+
     scene = {}
     i = _offset
-    scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)    
-    scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)    
-    
+    scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)
+    scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)
+
     if _verbose:
         pprint(scene)
-        
-    raise NotImplementedError 
+
+    raise NotImplementedError
 
     return scene
