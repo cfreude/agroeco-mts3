@@ -89,7 +89,7 @@ class RendererMts3():
                     'type': 'diffuse',
                     'reflectance': {
                         'type': 'rgb',
-                        'value': [0,1,1]
+                        'value': [1,0,0]
                     }
                 }
             }
@@ -567,7 +567,7 @@ class RendererMts3():
     def get_sky(_power):
         return {
             'type': 'envmap',
-            'filename': "./data/stuttgart_hillside_4k.exr",
+            'filename': "./imgs/stuttgart_hillside_4k.exr",
             'scale': _power,            
         }
 
