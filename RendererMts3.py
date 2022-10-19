@@ -567,7 +567,7 @@ class RendererMts3():
     def get_sky(_power):
         return {
             'type': 'envmap',
-            'filename': "./imgs/stuttgart_hillside_4k.exr",
+            'filename': "./imgs/stuttgart_hillside_1k.exr",
             'scale': _power,            
         }
 
