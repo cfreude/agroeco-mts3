@@ -7,7 +7,7 @@ def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _sho
 
     renderer = RendererMts3(_verbose)
     renderer.load_path(_path, _lat, _long, _datetime_str, _ray_count)
-    measurements = renderer.render(_ray_count)
+    measurements = None# renderer.render(_ray_count)
 
     if measurements is not None:
         out_path = os.path.splitext(os.path.split(_path)[-1])[0] +'.irrbin'

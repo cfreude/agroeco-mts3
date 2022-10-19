@@ -127,7 +127,7 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     scene = {'format': 1}
     i = _offset
     scene['obstacles'], i = load_mesh_entities(binary_array, 'obstacle', i, _verbose)
-    scene['sensors'], i = load_mesh_entities(binary_array, 'sensor', i, _verbose)
+    scene['sensors'], i = load_mesh_entities(binary_array, 'sensor', i, _verbose); scene['sensors'] = {}
     pointsCount, i = unpack(i, binary_array, 'I', _print_name='pointsCount') # uint32
     point_array = []
     for p in range(pointsCount):
@@ -191,7 +191,6 @@ def rectangle(_i, _bin_arr):
     data = {'type': 8}
     data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='rectangle.matrix')      
     return data, _i
-
 
 primitive_map = {
     1: disk,
@@ -281,9 +280,9 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
     logging.debug('Processing OBSTACLES ...')
     scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)       
     logging.debug('Processing SENSORS ...')
-    scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)    
+    scene['sensors'] = {}#, i = load_primitve_entities(binary_array, 'sensor', i, _verbose)
     
     if logging.root.level <= logging.DEBUG:
-        pprint(scene)
+        pass#pprint(scene)
 
     return scene

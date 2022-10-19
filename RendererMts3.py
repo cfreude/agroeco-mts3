@@ -1,3 +1,4 @@
+from distutils.log import debug
 import os, logging
 import dateutil
 import dateutil.parser
@@ -15,6 +16,15 @@ mi.set_variant("scalar_rgb")
 
 from mitsuba import PositionSample3f, ScalarTransform4f as T, SurfaceInteraction3f
 
+color_index = 0
+colors = [
+    [1,0,0],
+    [0,1,0],    
+    [0,0,1],    
+    [1,1,0],    
+    [1,0,1],    
+    [0,1,1],
+]
 default_ground_size = 1e6 #100 km
 
 class RendererMts3():
@@ -42,14 +52,51 @@ class RendererMts3():
         logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
         logging.debug(f"Sensor count: {sensor_count}")
 
-        diag = np.linalg.norm(maxv-minv)
-        origin, target = RendererMts3.get_camera(maxv[1], diag*0.5, _scene_center = avgv.tolist())
+        distance = np.linalg.norm(maxv-minv)*0.5
+        if distance <= 0:
+            distance = 5.0
+        height = maxv[1]
+        if maxv[1] == avgv[1]:
+            height += 0.5
+        scene_center = avgv.tolist()
+
+        scene_center = [2.5,0.0,0.0]; height = 6.0; distance = 10.0
+
+        origin, target = RendererMts3.get_camera(height, distance, scene_center)
+        logging.debug(f'camera origin: {origin}, target: {target}')
         self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
         sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
 
         merged_scene = {**self.mi_base_scene, **sun_sky, **sim_objects}
+
+        transf = T(np.array([
+                    1.0, 0.0, 0.0, 2.5,
+                    0.0, 2.0, 0.0, 0.1,
+                    0.0, 0.0, 1.0, 2.5,
+                    0, 0, 0, 1]).reshape((4,4)))
+        transf = T.translate([0, 2, 0]).rotate([0,1,0], 90).scale([0.5,2,1])
+        print(transf)
+
+        merged_scene['test_rect'] = {
+            'type': 'rectangle',
+            'to_world': transf,            
+            #'to_world': T.translate([2.5, 0.1, 2.5]),#@T.rotate([1,0,0], 90),
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0,1,1]
+                    }
+                }
+            }
+        }   
+        
+        # DEBUG AXIS
+        RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
@@ -73,7 +120,7 @@ class RendererMts3():
         return np.array(measurements)
 
     def show_render(self, _ray_count=128, _show=True, _save=''):
-        img = mi.render(self.mi_scene, spp=_ray_count)
+        img = mi.render(self.mi_scene, spp=_ray_count) * 0.01
         if (len(_save)):
             mi.util.write_bitmap(_save, img)
         if _show:
@@ -295,20 +342,22 @@ class RendererMts3():
         '''
         float32 matrix 4x3 (the bottom row is always 0 0 0 1) !ROW MAJOR
         '''
-        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))        
         out = {
             'type': 'disk',
-            'to_world': T(mat),
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            'to_world': T(mat)@T.rotate([1,0,0], 90),
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
         }   
         return out
-
     @staticmethod
     def cylinder(data):
         '''
@@ -316,19 +365,21 @@ class RendererMts3():
         float32 radius
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
         '''
-        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
-        lh = data['length']
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))      
         out = {
             'type': 'cylinder',
-            'p0': [0, lh, 0],
-            'p1': [0,-lh, 0],
+            'p0': [0, 0, 0],
+            'p1': [0, data['length'], 0],
             'radius': data['radius'],
             'to_world': T(mat),
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
         }   
@@ -344,11 +395,14 @@ class RendererMts3():
             'type': 'sphere',
             'center': data['center'],
             'radius': data['radius'],
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
         }   
@@ -356,18 +410,28 @@ class RendererMts3():
 
     @staticmethod
     def rectangle(data):
+        global color_index
         '''
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
         '''
+        print('raw values:', data['matrix'])
         mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
+        #print(data['matrix'])
+        color = colors[color_index]
+        color_index+=1 
+        print('color:', color, '| pos:', mat[0:3,3], '| scale:', np.diag(mat)[:3])
+        print('------------')
         out = {
             'type': 'rectangle',
-            'to_world': T(mat),
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            'to_world': T(mat),#@T.rotate([1,0,0], 90),
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': color
+                    }
                 }
             }
         }   
@@ -384,16 +448,42 @@ class RendererMts3():
             8: RendererMts3.rectangle,
         }
         
+        primitive_map_name = {
+            1: 'disk',
+            2: 'cylinder',
+            4: 'sphere',
+            8: 'rectangle',
+        }
+        
         mi_scene = {}
+
+        minv = np.array([-5,-5,-5])
+        avgv = np.array([0.0,0.0,0.0])
+        maxv = -minv
 
         # add sensors
         sensor_count = 0
         objects = _scene_data['sensors']
         for objk, surfaces in objects.items():
             for surfk, data in surfaces.items():
-                surface_name = '%s-%s' % (objk, surfk)   
-                data = primitive_map[data['type']](data)
-                data['sensor'] = {
+                surface_name = '%s-%s' % (objk, surfk)
+
+                # process AABB
+                pos = None
+                #if 'matrix' in data:
+                #    mat = data['matrix']
+                #    pos = np.array([mat[3], mat[7], mat[11]])                    
+
+                if 'center' in data:
+                    pos = data['center']
+
+                if pos is not None:
+                    avgv += pos
+                    minv = np.maximum(minv, pos)
+                    maxv = np.minimum(maxv, pos)
+
+                primitive = primitive_map[data['type']](data)
+                primitive['sensor'] = {
                     'type': 'irradiancemeter',
                     'sampler': {
                         'type': 'independent',
@@ -409,7 +499,7 @@ class RendererMts3():
                         'pixel_format': 'rgb',
                     },
                 }
-                mi_scene[surface_name] = mi.load_dict(data)
+                mi_scene[surface_name] = mi.load_dict(primitive)
                 sensor_count += 1
 
         # add obstacles
@@ -417,12 +507,12 @@ class RendererMts3():
         
         for objk, surfaces in objects.items():
             for surfk, data in surfaces.items():
-                surface_name = '%s-%s' % (objk, surfk)                                
-                mi_scene[surface_name] = mi.load_dict(primitive_map[data['type']](data))
+                surface_name = '%s-%s' % (objk, surfk) 
+                type_id = data['type']      
+                func = primitive_map[type_id]
+                #logging.debug(primitive_map_name[type_id])        
+                mi_scene[surface_name] = mi.load_dict(func(data))
 
-        minv = np.array([-1,-1,-1])
-        avgv = np.array([0,0,0])
-        maxv = np.array([1,1,1])
         
         if sensor_count < 1:            
             logging.warn('No sensors defined.')
@@ -499,38 +589,44 @@ class RendererMts3():
     @staticmethod
     def add_axis_spheres(mi_scene, _offset):
 
-        mi_scene['sphere_x'] = {
-            'type': 'sphere',
-            'to_world': mi.ScalarTransform4f.translate(_offset).translate([0.5,0,0]).scale([0.2, 0.2, 0.2]),
-            'bsdf': {
+        mi_scene['sphere_x'] = {            
+            'type': 'cylinder',
+            'p1': [1, 0, 0],
+            'radius': 0.1,
+            'to_world': mi.ScalarTransform4f.translate(_offset),
+            'material': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
-                    'value': [1, 0, 0]
+                    'value': [0.9, 0, 0]
                 }
             }
         }
 
         mi_scene['sphere_y'] = {
-            'type': 'sphere',
-            'to_world': mi.ScalarTransform4f.translate(_offset).translate([0,0.5,0]).scale([0.2, 0.2, 0.2]),
-            'bsdf': {
+            'type': 'cylinder',
+            'p1': [0, 1, 0],
+            'radius': 0.1,
+            'to_world': mi.ScalarTransform4f.translate(_offset),
+            'material': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
-                    'value': [0, 1, 0]
+                    'value': [0, 0.9, 0]
                 }
             }
         }
 
         mi_scene['sphere_z'] = {
-            'type': 'sphere',
-            'to_world': mi.ScalarTransform4f.translate(_offset).translate([0,0,0.5]).scale([0.2, 0.2, 0.2]),
-            'bsdf': {
+            'type': 'cylinder',
+            'p1': [0, 0, 1],
+            'radius': 0.1,
+            'to_world': mi.ScalarTransform4f.translate(_offset),
+            'material': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
-                    'value': [0, 0, 1]
+                    'value': [0, 0, 0.9]
                 }
             }
         }
@@ -591,8 +687,6 @@ class RendererMts3():
         print(params['sun.irradiance.value'])         
         print(params['sky.scale'])
         '''
-        
-        world_up = [0.0, 1.0, 0.0]
 
         for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
