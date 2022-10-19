@@ -280,7 +280,7 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
     logging.debug('Processing OBSTACLES ...')
     scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)       
     logging.debug('Processing SENSORS ...')
-    scene['sensors'] = {}#, i = load_primitve_entities(binary_array, 'sensor', i, _verbose)
+    scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)
     
     if logging.root.level <= logging.DEBUG:
         pass#pprint(scene)

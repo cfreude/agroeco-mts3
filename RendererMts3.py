@@ -16,15 +16,6 @@ mi.set_variant("scalar_rgb")
 
 from mitsuba import PositionSample3f, ScalarTransform4f as T, SurfaceInteraction3f
 
-color_index = 0
-colors = [
-    [1,0,0],
-    [0,1,0],    
-    [0,0,1],    
-    [1,1,0],    
-    [1,0,1],    
-    [0,1,1],
-]
 default_ground_size = 1e6 #100 km
 
 class RendererMts3():
@@ -60,7 +51,7 @@ class RendererMts3():
             height += 0.5
         scene_center = avgv.tolist()
 
-        scene_center = [2.5,0.0,0.0]; height = 6.0; distance = 10.0
+        scene_center = [2.5,0.0,0.0]; height = 5.0; distance = 7.0
 
         origin, target = RendererMts3.get_camera(height, distance, scene_center)
         logging.debug(f'camera origin: {origin}, target: {target}')
@@ -71,6 +62,7 @@ class RendererMts3():
 
         merged_scene = {**self.mi_base_scene, **sun_sky, **sim_objects}
 
+        '''
         transf = T(np.array([
                     1.0, 0.0, 0.0, 2.5,
                     0.0, 2.0, 0.0, 0.1,
@@ -94,7 +86,8 @@ class RendererMts3():
                 }
             }
         }   
-        
+        '''
+
         # DEBUG AXIS
         RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
 
@@ -410,17 +403,10 @@ class RendererMts3():
 
     @staticmethod
     def rectangle(data):
-        global color_index
         '''
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
         '''
-        print('raw values:', data['matrix'])
         mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
-        #print(data['matrix'])
-        color = colors[color_index]
-        color_index+=1 
-        print('color:', color, '| pos:', mat[0:3,3], '| scale:', np.diag(mat)[:3])
-        print('------------')
         out = {
             'type': 'rectangle',
             'to_world': T(mat),#@T.rotate([1,0,0], 90),
@@ -430,7 +416,7 @@ class RendererMts3():
                     'type': 'diffuse',
                     'reflectance': {
                         'type': 'rgb',
-                        'value': color
+                        'value': [0.5, 0.5, 0.5]
                     }
                 }
             }
