@@ -71,7 +71,7 @@ if __name__ == "__main__":
     logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
     FORMAT = '%(name)s :: %(levelname)-8s :: %(message)s'
     FORMAT = '%(levelname)-8s :: %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+    logging.basicConfig(format=FORMAT, level=logging.INFO)
 
     #test_directional(); quit()
     
@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     # test PRIMITIVE scene simulation / rendering
     #main('./data/obstacles.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 16, _verbose=True, _show_render=True); quit()
-    main('./data/t78.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 16, _verbose=True, _show_render=True); quit()
+    #main('./data/t78.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 32, _verbose=True, _show_render=True); quit()
     main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
 
     # test day cycle
