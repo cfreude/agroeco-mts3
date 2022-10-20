@@ -1,6 +1,7 @@
 import logging
 from RendererMts3 import RendererMts3
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import numpy as np
 
 class RenderServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -15,8 +16,12 @@ class RenderServer(BaseHTTPRequestHandler):
         latitude, longitude, datetime, rays = float(self.headers['La']), float(self.headers['Lo']), self.headers['Ti'], self.headers['Ra']
         rawData = self.rfile.read(length)
 
-        renderer.load_binary(rawData, latitude, longitude, datetime)
-        measurements = renderer.render(args.rays if rays == None else int(rays))
+        if args.dummy:
+            count = int(self.headers['C'])
+            measurements = np.ones(count, dtype=np.float32)
+        else:
+            renderer.load_binary(rawData, latitude, longitude, datetime)
+            measurements = renderer.render(args.rays if rays == None else int(rays))
 
         self.send_response(200)
         self.send_header("Content-type", "application/octet-stream")
@@ -34,6 +39,7 @@ if __name__ == "__main__":
     --port (unsighed int, default=9000) | Port to start the server
     --rays (unsigned int, default=128) | Number of rays to cast from each triangle in the mesh
     --verbose | Be verbose.
+    --dummy | Dummy mode that returns only ones. The count needs to be specified in a header `C`.
     """
 
     import argparse
@@ -42,6 +48,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=9000, help='Port to start the server.')
     parser.add_argument('--rays', type=int, default=128, help='Number of rays per element.')
     parser.add_argument('--verbose', type=bool, default=False, help='Verbose output to the console.')
+    parser.add_argument('--dummy', type=bool, default=False, help='Dummy mode that returns only ones.')
 
     args = parser.parse_args()
 
