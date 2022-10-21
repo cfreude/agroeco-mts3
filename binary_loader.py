@@ -127,7 +127,7 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     scene = {'format': 1}
     i = _offset
     scene['obstacles'], i = load_mesh_entities(binary_array, 'obstacle', i, _verbose)
-    scene['sensors'], i = load_mesh_entities(binary_array, 'sensor', i, _verbose); scene['sensors'] = {}
+    scene['sensors'], i = load_mesh_entities(binary_array, 'sensor', i, _verbose)
     pointsCount, i = unpack(i, binary_array, 'I', _print_name='pointsCount') # uint32
     point_array = []
     for p in range(pointsCount):
