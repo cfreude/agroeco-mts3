@@ -259,6 +259,7 @@ class RendererMts3():
             }
 
         mesh = mi.load_dict(ply)
+        os.remove(tmp_file_name)        
 
         return mesh
 
