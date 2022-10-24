@@ -16,11 +16,14 @@ class RenderServer(BaseHTTPRequestHandler):
         latitude, longitude, datetime, rays = float(self.headers['La']), float(self.headers['Lo']), self.headers['Ti'], self.headers['Ra']
         rawData = self.rfile.read(length)
 
+        if rays == None or rays <= 0:
+            rays = 128
+
         if args.dummy:
             count = int(self.headers['C'])
             measurements = np.ones(count, dtype=np.float32)
         else:
-            renderer.load_binary(rawData, latitude, longitude, datetime)
+            renderer.load_binary(rawData, latitude, longitude, datetime, rays)
             measurements = renderer.render(args.rays if rays == None else int(rays))
 
         self.send_response(200)
