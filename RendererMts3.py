@@ -358,24 +358,21 @@ class RendererMts3():
         float32 radius
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
         '''
-        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))      
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
         out = {
             'type': 'cylinder',
             'p0': [0, 0, 0],
             'p1': [0, data['length'], 0],
             'radius': data['radius'],
             'to_world': T(mat),
-            'bsdf': {
-                'type': 'twosided',
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
-        }   
+        }
         return out
 
     @staticmethod
@@ -388,17 +385,14 @@ class RendererMts3():
             'type': 'sphere',
             'center': data['center'],
             'radius': data['radius'],
-            'bsdf': {
-                'type': 'twosided',
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
-        }   
+        }
         return out
 
     @staticmethod
