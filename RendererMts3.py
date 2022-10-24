@@ -367,13 +367,10 @@ class RendererMts3():
             'radius': data['radius'],
             'to_world': T(mat),
             'bsdf': {
-                'type': 'twosided',
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
         }   
@@ -390,13 +387,10 @@ class RendererMts3():
             'center': data['center'],
             'radius': data['radius'],
             'bsdf': {
-                'type': 'twosided',
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
         }   

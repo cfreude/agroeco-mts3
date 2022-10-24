@@ -79,13 +79,16 @@ if __name__ == "__main__":
     #s = time.perf_counter_ns(); RendererMts3.test_sun(); logging.debug('classic', time.perf_counter_ns()-s); quit()
     #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); logging.debug('optimized', time.perf_counter_ns()-s); quit()
     
-    # test MESH scene simulation / rendering
-    #main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=False, _show_render=True); quit()
+    if 1:
+        show_render = False
+        # test MESH scene simulation / rendering
+        logging.info('Mesh test:')
+        main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
+        # test PRIMITIVE scene simulation / rendering
+        logging.info('Primitive test:')
+        main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
+        quit()
 
-    # test PRIMITIVE scene simulation / rendering
-    #main('./data/obstacles.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 16, _verbose=True, _show_render=True); quit()
-    #main('./data/t78.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 32, _verbose=True, _show_render=True); quit()
-    main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
 
     # test day cycle
     test_day_cylce(); quit()
