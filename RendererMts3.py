@@ -259,6 +259,7 @@ class RendererMts3():
             }
 
         mesh = mi.load_dict(ply)
+        os.remove(tmp_file_name)        
 
         return mesh
 
@@ -358,21 +359,21 @@ class RendererMts3():
         float32 radius
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
         '''
-        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))      
         out = {
             'type': 'cylinder',
             'p0': [0, 0, 0],
             'p1': [0, data['length'], 0],
             'radius': data['radius'],
             'to_world': T(mat),
-            'material': {
+            'bsdf': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
                     'value': [0.5, 0.5, 0.5]
                 }
             }
-        }
+        }   
         return out
 
     @staticmethod
@@ -385,14 +386,14 @@ class RendererMts3():
             'type': 'sphere',
             'center': data['center'],
             'radius': data['radius'],
-            'material': {
+            'bsdf': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
                     'value': [0.5, 0.5, 0.5]
                 }
             }
-        }
+        }   
         return out
 
     @staticmethod
@@ -414,27 +415,27 @@ class RendererMts3():
                     }
                 }
             }
-        }
+        }   
         return out
 
     @staticmethod
-    def load_sim_scene_primitives(_scene_data, _spp=128):
-
-        #(1 = disk, 2 = cylinder/stem, 4 = sphere/bud, 8 = rectangle/leaf)
+    def load_sim_scene_primitives(_scene_data, _spp=128):                        
+    
+        #(1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
         primitive_map = {
             1: RendererMts3.disk,
             2: RendererMts3.cylinder,
             4: RendererMts3.sphere,
             8: RendererMts3.rectangle,
         }
-
+        
         primitive_map_name = {
             1: 'disk',
             2: 'cylinder',
             4: 'sphere',
             8: 'rectangle',
         }
-
+        
         mi_scene = {}
 
         minv = np.array([-5,-5,-5])

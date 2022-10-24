@@ -3,17 +3,24 @@ from RendererMts3 import RendererMts3
 
 def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False, _save_render=''):
 
-    start = time.perf_counter_ns()
-
+    t_total = time.perf_counter_ns()
+    
     renderer = RendererMts3(_verbose)
+    logging.info(f'Renderer initialization dur.: {(time.perf_counter_ns()-t_total) /1e9:.2f} sec.')
+    
+    t = time.perf_counter_ns()    
     renderer.load_path(_path, _lat, _long, _datetime_str, _ray_count)
-    measurements = None# renderer.render(_ray_count)
+    logging.info(f'Scene loading dur.: {(time.perf_counter_ns()-t) /1e9:.2f} sec.')
+    
+    t = time.perf_counter_ns()
+    measurements = renderer.render(_ray_count)
+    logging.info(f'Rendering dur.: {(time.perf_counter_ns()-t) /1e9:.2f} sec.')
 
     if measurements is not None:
         out_path = os.path.splitext(os.path.split(_path)[-1])[0] +'.irrbin'
         measurements.tofile(out_path)
 
-    dur = time.perf_counter_ns() - start
+    dur = time.perf_counter_ns() - t_total
 
     if measurements is not None:      
         logging.info(f'Irradiance (binary, type: {measurements.dtype}) file saved to: {out_path} ... dur.: {dur / 1e9:.2f} sec.')
