@@ -1,5 +1,5 @@
-
-import time, os, logging
+from distutils.log import debug
+import os, logging
 import dateutil
 import dateutil.parser
 import datetime
@@ -40,17 +40,56 @@ class RendererMts3():
 
     def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp) -> None:
         sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
-        logging.debug("Scene statistics:", minv, avgv, maxv)
-        logging.debug("Sensor count: %d", sensor_count)
+        logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
+        logging.debug(f"Sensor count: {sensor_count}")
 
-        diag = np.linalg.norm(maxv-minv)
-        origin, target = RendererMts3.get_camera(maxv[1], diag*0.5, _scene_center = avgv.tolist())
+        distance = np.linalg.norm(maxv-minv)*0.5
+        if distance <= 0:
+            distance = 5.0
+        height = maxv[1]
+        if maxv[1] == avgv[1]:
+            height += 0.5
+        scene_center = avgv.tolist()
+
+        scene_center = [2.5,0.0,0.0]; height = 5.0; distance = 7.0
+
+        origin, target = RendererMts3.get_camera(height, distance, scene_center)
+        logging.debug(f'camera origin: {origin}, target: {target}')
         self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
         sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
 
         merged_scene = {**self.mi_base_scene, **sun_sky, **sim_objects}
+
+        '''
+        transf = T(np.array([
+                    1.0, 0.0, 0.0, 2.5,
+                    0.0, 2.0, 0.0, 0.1,
+                    0.0, 0.0, 1.0, 2.5,
+                    0, 0, 0, 1]).reshape((4,4)))
+        transf = T.translate([0, 2, 0]).rotate([0,1,0], 90).scale([0.5,2,1])
+        print(transf)
+
+        merged_scene['test_rect'] = {
+            'type': 'rectangle',
+            'to_world': transf,            
+            #'to_world': T.translate([2.5, 0.1, 2.5]),#@T.rotate([1,0,0], 90),
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [1,0,0]
+                    }
+                }
+            }
+        }   
+        '''
+
+        # DEBUG AXIS
+        RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
@@ -60,7 +99,11 @@ class RendererMts3():
         for i in range(self.sensor_count ):
             img = mi.render(self.mi_scene, sensor=i+1, spp=_ray_count)
             measurements.append(img.array)
-        return np.sum(np.array(measurements), axis=1)
+        if len(measurements) > 0:
+            return np.sum(np.array(measurements), axis=1)
+        else:
+            logging.warn('No measurements computed.')
+            return None
 
     #skips the rendering, useful just for testing the loading overhead
     def render_dummy(self, _ray_count) -> None:
@@ -70,7 +113,7 @@ class RendererMts3():
         return np.array(measurements)
 
     def show_render(self, _ray_count=128, _show=True, _save=''):
-        img = mi.render(self.mi_scene, spp=_ray_count)
+        img = mi.render(self.mi_scene, spp=_ray_count) * 0.01
         if (len(_save)):
             mi.util.write_bitmap(_save, img)
         if _show:
@@ -216,6 +259,7 @@ class RendererMts3():
             }
 
         mesh = mi.load_dict(ply)
+        os.remove(tmp_file_name)        
 
         return mesh
 
@@ -241,6 +285,14 @@ class RendererMts3():
 
     @staticmethod
     def load_sim_scene(_scene_data, _spp=128):
+
+        if _scene_data['format'] == 1:
+            return RendererMts3.load_sim_scene_meshes(_scene_data, _spp)
+        elif _scene_data['format'] == 2:            
+            return RendererMts3.load_sim_scene_primitives(_scene_data, _spp)
+
+    @staticmethod
+    def load_sim_scene_meshes(_scene_data, _spp=128):
 
         mi_scene = {}
 
@@ -274,6 +326,178 @@ class RendererMts3():
                 mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices)
                 mi_scene[surface_name] = mesh
 
+        if sensor_count < 1:            
+            logging.warn('No sensors defined.')
+
+        return mi_scene, (minv, avgv, maxv), sensor_count
+
+    @staticmethod
+    def disk(data):
+        '''
+        float32 matrix 4x3 (the bottom row is always 0 0 0 1) !ROW MAJOR
+        '''
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))        
+        out = {
+            'type': 'disk',
+            'to_world': T(mat)@T.rotate([1,0,0], 90),
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
+                }
+            }
+        }   
+        return out
+    @staticmethod
+    def cylinder(data):
+        '''
+        float32 length
+        float32 radius
+        float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+        '''
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))      
+        out = {
+            'type': 'cylinder',
+            'p0': [0, 0, 0],
+            'p1': [0, data['length'], 0],
+            'radius': data['radius'],
+            'to_world': T(mat),
+            'bsdf': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
+                }
+            }
+        }   
+        return out
+
+    @staticmethod
+    def sphere(data):
+        '''
+        3xfloat32 center
+        float32 radius
+        '''
+        out = {
+            'type': 'sphere',
+            'center': data['center'],
+            'radius': data['radius'],
+            'bsdf': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
+                }
+            }
+        }   
+        return out
+
+    @staticmethod
+    def rectangle(data):
+        '''
+        float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+        '''
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
+        out = {
+            'type': 'rectangle',
+            'to_world': T(mat),#@T.rotate([1,0,0], 90),
+            'bsdf': {
+                'type': 'twosided',
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
+                }
+            }
+        }   
+        return out
+
+    @staticmethod
+    def load_sim_scene_primitives(_scene_data, _spp=128):                        
+    
+        #(1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
+        primitive_map = {
+            1: RendererMts3.disk,
+            2: RendererMts3.cylinder,
+            4: RendererMts3.sphere,
+            8: RendererMts3.rectangle,
+        }
+        
+        primitive_map_name = {
+            1: 'disk',
+            2: 'cylinder',
+            4: 'sphere',
+            8: 'rectangle',
+        }
+        
+        mi_scene = {}
+
+        minv = np.array([-5,-5,-5])
+        avgv = np.array([0.0,0.0,0.0])
+        maxv = -minv
+
+        # add sensors
+        sensor_count = 0
+        objects = _scene_data['sensors']
+        for objk, surfaces in objects.items():
+            for surfk, data in surfaces.items():
+                surface_name = '%s-%s' % (objk, surfk)
+
+                # process AABB
+                pos = None
+                #if 'matrix' in data:
+                #    mat = data['matrix']
+                #    pos = np.array([mat[3], mat[7], mat[11]])                    
+
+                if 'center' in data:
+                    pos = data['center']
+
+                if pos is not None:
+                    avgv += pos
+                    minv = np.maximum(minv, pos)
+                    maxv = np.minimum(maxv, pos)
+
+                primitive = primitive_map[data['type']](data)
+                primitive['sensor'] = {
+                    'type': 'irradiancemeter',
+                    'sampler': {
+                        'type': 'independent',
+                        'sample_count': _spp
+                    },
+                    'film': {
+                        'type': 'hdrfilm',
+                        'width': 1,
+                        'height': 1,
+                        'rfilter': {
+                            'type': 'box',
+                        },
+                        'pixel_format': 'rgb',
+                    },
+                }
+                mi_scene[surface_name] = mi.load_dict(primitive)
+                sensor_count += 1
+
+        # add obstacles
+        objects = _scene_data['obstacles']
+        
+        for objk, surfaces in objects.items():
+            for surfk, data in surfaces.items():
+                surface_name = '%s-%s' % (objk, surfk) 
+                type_id = data['type']      
+                func = primitive_map[type_id]
+                #logging.debug(primitive_map_name[type_id])        
+                mi_scene[surface_name] = mi.load_dict(func(data))
+
+        
+        if sensor_count < 1:            
+            logging.warn('No sensors defined.')
+
         return mi_scene, (minv, avgv, maxv), sensor_count 
 
     @staticmethod
@@ -285,6 +509,7 @@ class RendererMts3():
         date = dateutil.parser.parse(_datetime_str)
         date.replace(tzinfo=datetime.timezone.utc)
 
+        '''
         if 0:
             print(date)
             print(date.date())
@@ -295,11 +520,12 @@ class RendererMts3():
             print(date.timetuple())
             print(_lat)
             print(_long)
+        '''
 
         azimut = get_azimuth(_lat, _long, date)
         altitude = get_altitude(_lat, _long, date)
 
-        logging.debug("Date: %s, azimut: %f, altitude: %f", date, azimut, altitude)
+        logging.debug(f"Date: {date}, azimut: {azimut}, altitude: {altitude}")
 
         azimut_in_rad = rad(azimut)
         z, x = -np.sin(azimut_in_rad), np.cos(azimut_in_rad)
@@ -322,7 +548,7 @@ class RendererMts3():
     def get_sky(_power):
         return {
             'type': 'envmap',
-            'filename': "./data/stuttgart_hillside_4k.exr",
+            'filename': "./imgs/stuttgart_hillside_1k.exr",
             'scale': _power,            
         }
 
@@ -344,38 +570,44 @@ class RendererMts3():
     @staticmethod
     def add_axis_spheres(mi_scene, _offset):
 
-        mi_scene['sphere_x'] = {
-            'type': 'sphere',
-            'to_world': mi.ScalarTransform4f.translate(_offset).translate([0.5,0,0]).scale([0.2, 0.2, 0.2]),
-            'bsdf': {
+        mi_scene['sphere_x'] = {            
+            'type': 'cylinder',
+            'p1': [1, 0, 0],
+            'radius': 0.1,
+            'to_world': mi.ScalarTransform4f.translate(_offset),
+            'material': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
-                    'value': [1, 0, 0]
+                    'value': [0.9, 0, 0]
                 }
             }
         }
 
         mi_scene['sphere_y'] = {
-            'type': 'sphere',
-            'to_world': mi.ScalarTransform4f.translate(_offset).translate([0,0.5,0]).scale([0.2, 0.2, 0.2]),
-            'bsdf': {
+            'type': 'cylinder',
+            'p1': [0, 1, 0],
+            'radius': 0.1,
+            'to_world': mi.ScalarTransform4f.translate(_offset),
+            'material': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
-                    'value': [0, 1, 0]
+                    'value': [0, 0.9, 0]
                 }
             }
         }
 
         mi_scene['sphere_z'] = {
-            'type': 'sphere',
-            'to_world': mi.ScalarTransform4f.translate(_offset).translate([0,0,0.5]).scale([0.2, 0.2, 0.2]),
-            'bsdf': {
+            'type': 'cylinder',
+            'p1': [0, 0, 1],
+            'radius': 0.1,
+            'to_world': mi.ScalarTransform4f.translate(_offset),
+            'material': {
                 'type': 'diffuse',
                 'reflectance': {
                     'type': 'rgb',
-                    'value': [0, 0, 1]
+                    'value': [0, 0, 0.9]
                 }
             }
         }
@@ -399,7 +631,7 @@ class RendererMts3():
         mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
         for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
-            print(datetime_str)
+            logging.debug(datetime_str)
             sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
             sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
             mi_scene = {**mi_scene, **sun_sky}
@@ -436,12 +668,10 @@ class RendererMts3():
         print(params['sun.irradiance.value'])         
         print(params['sky.scale'])
         '''
-        
-        world_up = [0.0, 1.0, 0.0]
 
         for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
-            print(datetime_str)
+            logging.debug(datetime_str)
             sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)          
             _, sun_power, sky_power = RendererMts3.get_sun_sky(sun_direction, 1000.0)
 
