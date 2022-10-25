@@ -87,41 +87,33 @@ def load_mesh_entities(binary_array, _prefix, i, _verbose=False):
 
 def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     """
-    uint8 version = 2
-    #OBSTACLES
-    uint32 entitiesCount
-    foreach ENTITY
-        uint32 surfacesCount
-        foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
-            #case disk
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case cylinder
-            float32 length
-            float32 radius
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case sphere
-            3xfloat32 center
-            float32 radius
-            #case rectangle
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-    #SENSORS
-    uint32 entitiesCount
-    foreach ENTITY
-        uint32 surfacesCount
-        foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
-            #case disk
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case cylinder
-            float32 length
-            float32 radius
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case sphere
-            3xfloat32 center
-            float32 radius
-            #case rectangle
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+    uint8 version = 1
+	#INDEXED DATA FOR OBSTACLES
+	uint32 entitiesCount
+	foreach ENTITY
+		uint32 surfacesCount
+		foreach SURFACE
+			uint8 trianglesCount
+			foreach TRIANGLE
+				uint32 index0
+				uint32 index1
+				uint32 index2
+	#INDEXED DATA FOR SENSORS
+	uint32 entitiesCount
+	foreach ENTITY
+		uint32 surfacesCount
+		foreach SURFACE
+			uint8 trianglesCount
+			foreach TRIANGLE
+				uint32 index0
+				uint32 index1
+				uint32 index2
+	#POINTS DATA
+	uint32 pointsCount
+		#foreach POINT
+		float32 x
+		float32 y
+		float32 z
     """
 
     scene = {'format': 1}

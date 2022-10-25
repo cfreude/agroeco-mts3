@@ -2,6 +2,7 @@ import os, logging, time, datetime
 import numpy as np
 from RendererMts3 import RendererMts3
 from render import main
+from binary_loader import load_path
 
 def test_day_cylce():
 
@@ -73,6 +74,7 @@ if __name__ == "__main__":
     FORMAT = '%(levelname)-8s :: %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)
 
+    #load_path('./data/t1999.mesh', True); quit();
     #test_directional(); quit()
     
     # test sun cycle
@@ -80,10 +82,10 @@ if __name__ == "__main__":
     #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); logging.debug('optimized', time.perf_counter_ns()-s); quit()
     
     if 1:
-        show_render = False
+        show_render = True
         # test MESH scene simulation / rendering
         logging.info('Mesh test:')
-        main('./data/t1999.bin', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
+        main('./data/t1999.mesh', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
         # test PRIMITIVE scene simulation / rendering
         logging.info('Primitive test:')
         main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
