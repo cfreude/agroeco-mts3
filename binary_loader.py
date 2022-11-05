@@ -87,41 +87,33 @@ def load_mesh_entities(binary_array, _prefix, i, _verbose=False):
 
 def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     """
-    uint8 version = 2
-    #OBSTACLES
-    uint32 entitiesCount
-    foreach ENTITY
-        uint32 surfacesCount
-        foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
-            #case disk
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case cylinder
-            float32 length
-            float32 radius
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case sphere
-            3xfloat32 center
-            float32 radius
-            #case rectangle
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-    #SENSORS
-    uint32 entitiesCount
-    foreach ENTITY
-        uint32 surfacesCount
-        foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
-            #case disk
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case cylinder
-            float32 length
-            float32 radius
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-            #case sphere
-            3xfloat32 center
-            float32 radius
-            #case rectangle
-            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+    uint8 version = 1
+	#INDEXED DATA FOR OBSTACLES
+	uint32 entitiesCount
+	foreach ENTITY
+		uint32 surfacesCount
+		foreach SURFACE
+			uint8 trianglesCount
+			foreach TRIANGLE
+				uint32 index0
+				uint32 index1
+				uint32 index2
+	#INDEXED DATA FOR SENSORS
+	uint32 entitiesCount
+	foreach ENTITY
+		uint32 surfacesCount
+		foreach SURFACE
+			uint8 trianglesCount
+			foreach TRIANGLE
+				uint32 index0
+				uint32 index1
+				uint32 index2
+	#POINTS DATA
+	uint32 pointsCount
+		#foreach POINT
+		float32 x
+		float32 y
+		float32 z
     """
 
     scene = {'format': 1}
@@ -139,57 +131,57 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
 
     if logging.root.level <= logging.DEBUG:
         pprint(scene)
-        
+
     return scene
 
 
 def disk(_i, _bin_arr):
     '''
-    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
+    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/bud, 8 = rectangle/leaf)
     #case disk (currently not used)
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
-    '''  
-    data = {'type': 1} 
-    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='disk.matrix') 
+    '''
+    data = {'type': 1}
+    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='disk.matrix')
     return data, _i
 
 
 def cylinder(_i, _bin_arr):
     '''
-    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
+    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/bud, 8 = rectangle/leaf)
     #case cylinder
         float32 length
         float32 radius
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
     data = {'type': 2}
-    data['length'], _i = unpack(_i, _bin_arr, 'f', _print_name='cylinder.length')                            
-    data['radius'], _i = unpack(_i, _bin_arr, 'f', _print_name='cylinder.radius')                         
-    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='cylinder.matrix')             
+    data['length'], _i = unpack(_i, _bin_arr, 'f', _print_name='cylinder.length')
+    data['radius'], _i = unpack(_i, _bin_arr, 'f', _print_name='cylinder.radius')
+    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='cylinder.matrix')
     return data, _i
 
 
 def sphere(_i, _bin_arr):
     '''
-    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
+    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/bud, 8 = rectangle/leaf)
     #case sphere
         3xfloat32 center
         float32 radius
     '''
     data = {'type': 4}
-    data['center'], _i = unpack(_i, _bin_arr, 'fff', _print_name='sphere.center')             
-    data['radius'], _i = unpack(_i, _bin_arr, 'f', _print_name='sphere.radius')               
+    data['center'], _i = unpack(_i, _bin_arr, 'fff', _print_name='sphere.center')
+    data['radius'], _i = unpack(_i, _bin_arr, 'f', _print_name='sphere.radius')
     return data, _i
 
 
 def rectangle(_i, _bin_arr):
     '''
-    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
+    uint8 primitiveType    (1 = disk, 2 = cylinder/stem, 4 = sphere/bud, 8 = rectangle/leaf)
     #case rectangle
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     '''
     data = {'type': 8}
-    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='rectangle.matrix')      
+    data['matrix'], _i = unpack(_i, _bin_arr, 'f'*12, _print_name='rectangle.matrix')
     return data, _i
 
 primitive_map = {
@@ -205,7 +197,7 @@ def load_primitve_entities(binary_array, _prefix, i, _verbose=False):
     foreach ENTITY
         uint32 surfacesCount
         foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
+            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(bud), 8 = rectangle(leaf)
             #case disk
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
             #case cylinder
@@ -244,7 +236,7 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
     foreach ENTITY
         uint32 surfacesCount
         foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
+            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(bud), 8 = rectangle(leaf)
             #case disk
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
             #case cylinder
@@ -261,7 +253,7 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
     foreach ENTITY
         uint32 surfacesCount
         foreach SURFACE
-            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(shoot), 8 = rectangle(leaf)
+            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(bud), 8 = rectangle(leaf)
             #case disk
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
             #case cylinder
