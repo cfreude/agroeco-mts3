@@ -66,20 +66,20 @@ def unpack(_i, _bin_arr, _str, _bytePerType=4, _print_name=None):
 
 def load_mesh_entities(binary_array, _prefix, i, _verbose=False):
     entities = {}
-    entitiesCount, i = unpack(i, binary_array, 'I', _print_name='entitiesCount') # uint32
+    entitiesCount, i = unpack(i, binary_array, 'I', _print_name=f"{_prefix}-entitiesCount") # uint32
     for e in range(entitiesCount):
-        surfacesCount, i = unpack(i, binary_array, 'I', _print_name='surfacesCount') # uint32
         entity_key = f"{_prefix}-entitiy{e}"
+        surfacesCount, i = unpack(i, binary_array, 'I', _print_name=f"{entity_key}-surfacesCount") # uint32
         entities[entity_key] = {}
         for s in range(surfacesCount):
-            trianglesCount, i = unpack(i, binary_array, 'B', 1, _print_name='trianglesCount') # uint8
             surface_key = f"surface{s}"
+            trianglesCount, i = unpack(i, binary_array, 'B', 1, _print_name=f"{surface_key}-trianglesCount") # uint8
             triangle_indices = []
             for t in range(trianglesCount):
                 index_tripplet, i = unpack(i, binary_array, 'III', _print_name='index_tripplet')  # 3x uint32
                 triangle_indices.append(index_tripplet)
                 [ind0, ind1, ind2] = index_tripplet
-                logging.debug(f'index #{t}, | ({ind0}, {ind1}, {ind2}), | byte index: {i}')
+                logging.debug(f'{surface_key}-triangle-index #{t}, | ({ind0}, {ind1}, {ind2}), | byte index: {i}')
             entities[entity_key][surface_key] = triangle_indices
 
     return entities, i
@@ -123,7 +123,7 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     pointsCount, i = unpack(i, binary_array, 'I', _print_name='pointsCount') # uint32
     point_array = []
     for p in range(pointsCount):
-        point, i = unpack(i, binary_array, 'fff', _print_name='pointsCount') # 3x float32        
+        point, i = unpack(i, binary_array, 'fff') # 3x float32        
         point_array.append(point)
         [x, y, z] = point
         logging.debug(f'point #{p} | ({x}, {y}, {z}) | byte index: {i}')
