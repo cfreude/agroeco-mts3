@@ -72,18 +72,18 @@ if __name__ == "__main__":
     logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
     FORMAT = '%(name)s :: %(levelname)-8s :: %(message)s'
     FORMAT = '%(levelname)-8s :: %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
-
-    load_path('./data/t126.mesh', True); quit()
+    logging.basicConfig(format=FORMAT, level=logging.INFO)
+    
+    #load_path('./data/t126.mesh', True); quit()
     #test_directional(); quit()
     
     # test sun cycle
     #s = time.perf_counter_ns(); RendererMts3.test_sun(); logging.debug('classic', time.perf_counter_ns()-s); quit()
     #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); logging.debug('optimized', time.perf_counter_ns()-s); quit()
     
-    main('./data/t126.mesh', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
+    #main('./data/t126.mesh', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
 
-    if 1:
+    if 0:
         show_render = True
         # test MESH scene simulation / rendering
         logging.info('Mesh test:')
@@ -95,15 +95,16 @@ if __name__ == "__main__":
 
 
     # test day cycle
-    test_day_cylce(); quit()
-
-    """start = datetime.datetime(2022, 1, 30)
+    #test_day_cylce(); quit()
+    start = datetime.datetime(2022, 1, 30)
     end = datetime.datetime(2021, 2, 2)
     step = datetime.timedelta(minutes=30)
     c = 1
 
-    while (start <= end):
-        main('./data/t1999.mesh', 48.21, 16.36, start.isoformat()+'+01:00', 128, _save_render=f'img/{str(c).zfill(5)}.jpg')
+    print(start >= end)
+    while (start >=  end):
+        print(start)
+        main('./data/t1999.prim', 48.21, 16.36, start.isoformat()+'+01:00', 4, _save_render=f'./{str(c).zfill(5)}.jpg')
         start += step
         c += 1
-    """
+
