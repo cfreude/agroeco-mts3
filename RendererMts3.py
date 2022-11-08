@@ -133,7 +133,8 @@ class RendererMts3():
 
     def show_render(self, _ray_count=128, _show=True, _save=''):
         img = mi.render(self.mi_scene, spp=_ray_count) * 0.01
-        if (len(_save)):
+        if len(_save):
+            logging.info(f'saving image to: {_save}')
             mi.util.write_bitmap(_save, img)
         if _show:
             plt.figure()
