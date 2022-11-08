@@ -72,15 +72,17 @@ if __name__ == "__main__":
     logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
     FORMAT = '%(name)s :: %(levelname)-8s :: %(message)s'
     FORMAT = '%(levelname)-8s :: %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
+    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
-    #load_path('./data/t1999.mesh', True); quit();
+    load_path('./data/t126.mesh', True); quit()
     #test_directional(); quit()
     
     # test sun cycle
     #s = time.perf_counter_ns(); RendererMts3.test_sun(); logging.debug('classic', time.perf_counter_ns()-s); quit()
     #s = time.perf_counter_ns(); RendererMts3.test_sun_optimized(); logging.debug('optimized', time.perf_counter_ns()-s); quit()
     
+    main('./data/t126.mesh', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=True); quit()
+
     if 1:
         show_render = True
         # test MESH scene simulation / rendering
