@@ -30,15 +30,15 @@ class RendererMts3():
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
 
-    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp) -> None:
+    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp) -> dict:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
+        return self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_path(self, _path, _latitude, _longitude, _datetime_str, _spp) -> None:
+    def load_path(self, _path, _latitude, _longitude, _datetime_str, _spp) -> dict:
         scene_dict = binary_loader.load_path(_path, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
+        return self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp) -> None:
+    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp) -> dict:
         sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
         logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
         logging.debug(f"Sensor count: {sensor_count}")
@@ -93,6 +93,8 @@ class RendererMts3():
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
+
+        return merged_scene
 
     def render(self, _ray_count) -> None:
         measurements = []
