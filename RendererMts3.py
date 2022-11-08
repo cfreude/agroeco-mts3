@@ -28,17 +28,17 @@ class RendererMts3():
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
 
         origin, target = RendererMts3.get_camera(2.0, 4.0)
-        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
+        self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _spp=16, _cam_origin=origin, _cam_target=target)
 
-    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp) -> None:
+    def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp, cam = None) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
+        return self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp, cam)
 
     def load_path(self, _path, _latitude, _longitude, _datetime_str, _spp) -> None:
         scene_dict = binary_loader.load_path(_path, self.verbose)
         self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp) -> None:
+    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp, cam = None) -> None:
         sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
         logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
         logging.debug(f"Sensor count: {sensor_count}")
@@ -53,9 +53,20 @@ class RendererMts3():
 
         scene_center = [2.5,0.0,0.0]; height = 5.0; distance = 7.0
 
-        origin, target = RendererMts3.get_camera(height, distance, scene_center)
-        logging.debug(f'camera origin: {origin}, target: {target}')
-        self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=_spp, _cam_origin=origin, _cam_target=target)
+        if cam is None:
+            origin, target = RendererMts3.get_camera(height, distance, scene_center)
+            width = 512
+            height = width
+            fov = 70
+            logging.debug(f'camera origin: {origin}, target: {target}')
+        else:
+            width = int(cam['width'])
+            height = int(cam['height'])
+            fov = float(cam['fov']) * 1.3
+            origin = cam['origin'].tolist()
+            target = cam['target'].tolist()
+
+        self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _width=width, _height=height, _fov=fov, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
         sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
@@ -93,6 +104,7 @@ class RendererMts3():
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
+        return merged_scene
 
     def render(self, _ray_count) -> None:
         measurements = []
@@ -105,24 +117,8 @@ class RendererMts3():
             logging.warn('No measurements computed.')
             return None
 
-    def render_for_cam(self, matrix, fov, width, height, _ray_count):
-        tmp = mi.traverse(self.mi_scene)
-        backupMatrix = tmp['camera_base.to_world']
-        backupFOV = tmp['camera_base.fov']
-        backupWidth = tmp['camera_base.film_base.width']
-        backupHeight = tmp['camera_base.film_base.height']
-        tmp['camera_base.to_world'] = matrix
-        tmp['camera_base.fov'] = fov
-        tmp['camera_base.film_base.width'] = width
-        tmp['camera_base.film_base.height'] = height
-        tmp.update()
-        result = mi.render(self.mi_scene, spp=_ray_count)
-        tmp['camera_base.to_world'] = backupMatrix
-        tmp['camera_base.fov'] = backupFOV
-        tmp['camera_base.film_base.width'] = backupWidth
-        tmp['camera_base.film_base.height'] = backupHeight
-        tmp.update()
-        return result
+    def render_for_cam(self, _ray_count):
+        return np.array(mi.render(self.mi_scene, spp=_ray_count).array)
 
     #skips the rendering, useful just for testing the loading overhead
     def render_dummy(self, _ray_count) -> None:
@@ -143,7 +139,7 @@ class RendererMts3():
             plt.show()
 
     @staticmethod
-    def create_base_scene(_size, _res=512, _spp=128, _cam_origin=[0,1,1], _cam_target=[0,0,0]):
+    def create_base_scene(_size, _width=512, _height=512, _spp=128, _cam_origin=[0,1,1], _cam_target=[0,0,0], _fov=70):
 
         base_scene = {
             'type': 'scene',
@@ -152,7 +148,7 @@ class RendererMts3():
             },
             'camera_base': {
                 'type': 'perspective',
-                'fov': 70,
+                'fov': _fov,
                 'to_world': mi.ScalarTransform4f.look_at(
                     origin=_cam_origin,
                     target=_cam_target,
@@ -160,8 +156,8 @@ class RendererMts3():
                 'film_base': {
                     'type': 'hdrfilm',
                     'pixel_format': 'rgba',
-                    'width': _res,
-                    'height': _res
+                    'width': _width,
+                    'height': _height
                 },
                 'sampler_id': {
                     'type': 'independent',
@@ -647,7 +643,7 @@ class RendererMts3():
         im = ax.imshow(image)
 
         origin, target = RendererMts3.get_camera(2.0, 4.0)
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, _spp=16, _cam_origin=origin, _cam_target=target)
         for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             logging.debug(datetime_str)
@@ -672,7 +668,7 @@ class RendererMts3():
         sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
         sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
         origin, target = RendererMts3.get_camera(2.0, 4.0)
-        mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
+        mi_scene = RendererMts3.create_base_scene(default_ground_size, _spp=16, _cam_origin=origin, _cam_target=target)
 
         mi_scene = {**mi_scene, **sun_sky}
         RendererMts3.add_axis_spheres(mi_scene, [0,0,0])

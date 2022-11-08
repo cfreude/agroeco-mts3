@@ -17,7 +17,7 @@ class RenderServer(BaseHTTPRequestHandler):
         camera = self.headers["Cam"]
         rawData = self.rfile.read(length)
 
-        if rays == None or rays <= 0:
+        if rays == None or int(rays) <= 0:
             rays = 128 if args.rays == None else int(args.rays)
         else:
             rays = int(rays)
@@ -26,23 +26,23 @@ class RenderServer(BaseHTTPRequestHandler):
             count = int(self.headers['C'])
             measurements = np.ones(count, dtype=np.float32)
         else:
-            renderer.load_binary(rawData, latitude, longitude, datetime, rays)
             if camera is None:
+                renderer.load_binary(rawData, latitude, longitude, datetime, rays)
                 measurements = renderer.render(rays)
             else:
                 print(camera)
                 allCameraParams = np.fromstring(camera, dtype=np.float32, sep=' ')
-                #matrix = np.vstack(np.reshape(allCameraParams[:12], (4,3)), np.array([0, 0, 0, 1]))
-                matrix = np.vstack((allCameraParams[:4], allCameraParams[4:8], allCameraParams[8:12],[0,0,0,1]))
+                cam = {}
+                cam['origin'] = np.array(allCameraParams[:3])
+                cam['target'] = cam['origin'] - np.array(allCameraParams[3:6])
+                cam['fov'] = allCameraParams[6]
+                cam['width'] = np.int32(allCameraParams[7])
+                cam['height'] = np.int32(allCameraParams[8])
 
-                fov = allCameraParams[12]
-                width = np.int32(allCameraParams[13])
-                height = np.int32(allCameraParams[14])
-                print(matrix)
-                print(fov, width, height)
-                #measurements = renderer.render_for_cam(matrix, fov, width, height, rays)
-                measurements = np.zeros(width * height * 3, dtype=np.float32)
-                print(measurements)
+                renderer.load_binary(rawData, latitude, longitude, datetime, rays, cam)
+                measurements = renderer.render_for_cam(rays)
+                #measurements = np.zeros(width * height * 3, dtype=np.float32)
+                #print(measurements)
 
         self.send_response(200)
         self.send_header("Content-type", "application/octet-stream")
