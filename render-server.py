@@ -14,17 +14,35 @@ class RenderServer(BaseHTTPRequestHandler):
 
         length = int(self.headers['Content-Length'])
         latitude, longitude, datetime, rays = float(self.headers['La']), float(self.headers['Lo']), self.headers['Ti'], self.headers['Ra']
+        camera = self.headers["Cam"]
         rawData = self.rfile.read(length)
 
         if rays == None or rays <= 0:
-            rays = 128
+            rays = 128 if args.rays == None else int(args.rays)
+        else:
+            rays = int(rays)
 
         if args.dummy:
             count = int(self.headers['C'])
             measurements = np.ones(count, dtype=np.float32)
         else:
             renderer.load_binary(rawData, latitude, longitude, datetime, rays)
-            measurements = renderer.render(args.rays if rays == None else int(rays))
+            if camera is None:
+                measurements = renderer.render(rays)
+            else:
+                print(camera)
+                allCameraParams = np.fromstring(camera, dtype=np.float32, sep=' ')
+                #matrix = np.vstack(np.reshape(allCameraParams[:12], (4,3)), np.array([0, 0, 0, 1]))
+                matrix = np.vstack((allCameraParams[:4], allCameraParams[4:8], allCameraParams[8:12],[0,0,0,1]))
+
+                fov = allCameraParams[12]
+                width = np.int32(allCameraParams[13])
+                height = np.int32(allCameraParams[14])
+                print(matrix)
+                print(fov, width, height)
+                #measurements = renderer.render_for_cam(matrix, fov, width, height, rays)
+                measurements = np.zeros(width * height * 3, dtype=np.float32)
+                print(measurements)
 
         self.send_response(200)
         self.send_header("Content-type", "application/octet-stream")

@@ -26,7 +26,7 @@ class RendererMts3():
         self.verbose = _verbose
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
-        
+
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
 
@@ -73,7 +73,7 @@ class RendererMts3():
 
         merged_scene['test_rect'] = {
             'type': 'rectangle',
-            'to_world': transf,            
+            'to_world': transf,
             #'to_world': T.translate([2.5, 0.1, 2.5]),#@T.rotate([1,0,0], 90),
             'bsdf': {
                 'type': 'twosided',
@@ -85,7 +85,7 @@ class RendererMts3():
                     }
                 }
             }
-        }   
+        }
         '''
 
         # DEBUG AXIS
@@ -104,6 +104,25 @@ class RendererMts3():
         else:
             logging.warn('No measurements computed.')
             return None
+
+    def render_for_cam(self, matrix, fov, width, height, _ray_count):
+        tmp = mi.traverse(self.mi_scene)
+        backupMatrix = tmp['camera_base.to_world']
+        backupFOV = tmp['camera_base.fov']
+        backupWidth = tmp['camera_base.film_base.width']
+        backupHeight = tmp['camera_base.film_base.height']
+        tmp['camera_base.to_world'] = matrix
+        tmp['camera_base.fov'] = fov
+        tmp['camera_base.film_base.width'] = width
+        tmp['camera_base.film_base.height'] = height
+        tmp.update()
+        result = mi.render(self.mi_scene, spp=_ray_count)
+        tmp['camera_base.to_world'] = backupMatrix
+        tmp['camera_base.fov'] = backupFOV
+        tmp['camera_base.film_base.width'] = backupWidth
+        tmp['camera_base.film_base.height'] = backupHeight
+        tmp.update()
+        return result
 
     #skips the rendering, useful just for testing the loading overhead
     def render_dummy(self, _ray_count) -> None:
@@ -259,7 +278,7 @@ class RendererMts3():
             }
 
         mesh = mi.load_dict(ply)
-        os.remove(tmp_file_name)        
+        os.remove(tmp_file_name)
 
         return mesh
 
@@ -288,7 +307,7 @@ class RendererMts3():
 
         if _scene_data['format'] == 1:
             return RendererMts3.load_sim_scene_meshes(_scene_data, _spp)
-        elif _scene_data['format'] == 2:            
+        elif _scene_data['format'] == 2:
             return RendererMts3.load_sim_scene_primitives(_scene_data, _spp)
 
     @staticmethod
@@ -301,7 +320,7 @@ class RendererMts3():
         minv = np.min(vertex_positions, axis=0)
         maxv = np.max(vertex_positions, axis=0)
         logging.debug(f'Vertex position statistics: min={minv}, avg={avgv}, max={maxv}')
-        
+
         # add sensors
         sensor_count = 0
         objects = _scene_data['sensors']
@@ -326,7 +345,7 @@ class RendererMts3():
                 mesh = RendererMts3.create_triangle_mesh(surface_name, surface_vertices, surface_triangle_indices)
                 mi_scene[surface_name] = mesh
 
-        if sensor_count < 1:            
+        if sensor_count < 1:
             logging.warn('No sensors defined.')
 
         return mi_scene, (minv, avgv, maxv), sensor_count
@@ -336,7 +355,7 @@ class RendererMts3():
         '''
         float32 matrix 4x3 (the bottom row is always 0 0 0 1) !ROW MAJOR
         '''
-        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))        
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
         out = {
             'type': 'disk',
             'to_world': T(mat)@T.rotate([1,0,0], 90),
@@ -350,7 +369,7 @@ class RendererMts3():
                     }
                 }
             }
-        }   
+        }
         return out
     @staticmethod
     def cylinder(data):
@@ -359,7 +378,7 @@ class RendererMts3():
         float32 radius
         float32 matrix 4x3 (the bottom row is always 0 0 0 1)
         '''
-        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))      
+        mat = np.array(data['matrix']+[0,0,0,1]).reshape((4,4))
         out = {
             'type': 'cylinder',
             'p0': [0, 0, 0],
@@ -373,7 +392,7 @@ class RendererMts3():
                     'value': [0.5, 0.5, 0.5]
                 }
             }
-        }   
+        }
         return out
 
     @staticmethod
@@ -393,7 +412,7 @@ class RendererMts3():
                     'value': [0.5, 0.5, 0.5]
                 }
             }
-        }   
+        }
         return out
 
     @staticmethod
@@ -415,12 +434,12 @@ class RendererMts3():
                     }
                 }
             }
-        }   
+        }
         return out
 
     @staticmethod
-    def load_sim_scene_primitives(_scene_data, _spp=128):                        
-    
+    def load_sim_scene_primitives(_scene_data, _spp=128):
+
         #(1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
         primitive_map = {
             1: RendererMts3.disk,
@@ -428,14 +447,14 @@ class RendererMts3():
             4: RendererMts3.sphere,
             8: RendererMts3.rectangle,
         }
-        
+
         primitive_map_name = {
             1: 'disk',
             2: 'cylinder',
             4: 'sphere',
             8: 'rectangle',
         }
-        
+
         mi_scene = {}
 
         minv = np.array([-5,-5,-5])
@@ -453,7 +472,7 @@ class RendererMts3():
                 pos = None
                 #if 'matrix' in data:
                 #    mat = data['matrix']
-                #    pos = np.array([mat[3], mat[7], mat[11]])                    
+                #    pos = np.array([mat[3], mat[7], mat[11]])
 
                 if 'center' in data:
                     pos = data['center']
@@ -485,20 +504,20 @@ class RendererMts3():
 
         # add obstacles
         objects = _scene_data['obstacles']
-        
+
         for objk, surfaces in objects.items():
             for surfk, data in surfaces.items():
-                surface_name = '%s-%s' % (objk, surfk) 
-                type_id = data['type']      
+                surface_name = '%s-%s' % (objk, surfk)
+                type_id = data['type']
                 func = primitive_map[type_id]
-                #logging.debug(primitive_map_name[type_id])        
+                #logging.debug(primitive_map_name[type_id])
                 mi_scene[surface_name] = mi.load_dict(func(data))
 
-        
-        if sensor_count < 1:            
+
+        if sensor_count < 1:
             logging.warn('No sensors defined.')
 
-        return mi_scene, (minv, avgv, maxv), sensor_count 
+        return mi_scene, (minv, avgv, maxv), sensor_count
 
     @staticmethod
     def get_sun_direction( _lat, _long, _datetime_str):
@@ -549,7 +568,7 @@ class RendererMts3():
         return {
             'type': 'envmap',
             'filename': "./imgs/stuttgart_hillside_1k.exr",
-            'scale': _power,            
+            'scale': _power,
         }
 
     @staticmethod
@@ -557,8 +576,8 @@ class RendererMts3():
 
         _dot = np.dot([0,1,0], _direction)
         dot_scaler = np.max([0.0, _dot])
-                
-        sun_power = dot_scaler * _power * 5.0/6.0 # -1/6 for clowdy sky 
+
+        sun_power = dot_scaler * _power * 5.0/6.0 # -1/6 for clowdy sky
         sky_power = dot_scaler * 1.0
 
         scene = {}
@@ -570,7 +589,7 @@ class RendererMts3():
     @staticmethod
     def add_axis_spheres(mi_scene, _offset):
 
-        mi_scene['sphere_x'] = {            
+        mi_scene['sphere_x'] = {
             'type': 'cylinder',
             'p1': [1, 0, 0],
             'radius': 0.1,
@@ -616,7 +635,7 @@ class RendererMts3():
 
     @staticmethod
     def get_camera(_height, _distance, _scene_center=[0,0,0]):
-        origin = np.array([0, _height, _distance]) + np.array(_scene_center)       
+        origin = np.array([0, _height, _distance]) + np.array(_scene_center)
         target = _scene_center
         return origin.tolist(), target
 
@@ -626,7 +645,7 @@ class RendererMts3():
         fig,ax = plt.subplots(1,1)
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
-        
+
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
         for i in range(6, 21):
@@ -648,31 +667,31 @@ class RendererMts3():
         fig,ax = plt.subplots(1,1)
         image = np.array(np.zeros((256, 256, 3)))
         im = ax.imshow(image)
-                
+
         datetime_str = '2022-08-23T%00d:00:00+02:00' % 0
         sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
         sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         mi_scene = RendererMts3.create_base_scene(default_ground_size, _res=512, _spp=16, _cam_origin=origin, _cam_target=target)
-        
+
         mi_scene = {**mi_scene, **sun_sky}
         RendererMts3.add_axis_spheres(mi_scene, [0,0,0])
-                
+
         scene = mi.load_dict(mi_scene)
         params = mi.traverse(scene)
 
         '''
         print(params)
         print('#########')
-        print(params['sun.to_world'])         
-        print(params['sun.irradiance.value'])         
+        print(params['sun.to_world'])
+        print(params['sun.irradiance.value'])
         print(params['sky.scale'])
         '''
 
         for i in range(6, 21):
             datetime_str = '2022-08-23T%00d:00:00+02:00' % i
             logging.debug(datetime_str)
-            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)          
+            sun_direction = RendererMts3.get_sun_direction(48.21, 16.36, datetime_str)
             _, sun_power, sky_power = RendererMts3.get_sun_sky(sun_direction, 1000.0)
 
             dn = np.linalg.norm(sun_direction)
