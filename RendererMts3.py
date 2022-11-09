@@ -58,13 +58,14 @@ class RendererMts3():
             width = 512
             height = width
             fov = 70
-            logging.debug(f'camera origin: {origin}, target: {target}')
         else:
             width = int(cam['width'])
             height = int(cam['height'])
             fov = float(cam['fov'])
             origin = cam['origin'].tolist()
             target = cam['target'].tolist()
+
+        logging.debug(f'camera origin: {origin}, target: {target}')
 
         self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _width=width, _height=height, _fov=fov, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
@@ -118,14 +119,17 @@ class RendererMts3():
             return None
 
     def render_for_cam(self, _ray_count):
-        return np.array(mi.render(self.mi_scene, spp=_ray_count).array)
+        result = np.array(mi.render(self.mi_scene, spp=_ray_count).array)
+        rgb = result[np.mod(np.arange(result.size), 4) != 3]
+        max = np.max(rgb)
+        return rgb / max if max > 0 else rgb
 
-    #skips the rendering, useful just for testing the loading overhead
-    def render_dummy(self, _ray_count) -> None:
+    #skips the rendering, useful just for testing the loading overhead and debugging indexing
+    def render_dummy(self, _sensor_count) -> None:
         measurements = []
-        for i in range(self.sensor_count ):
-            measurements.append(1.0)
-        return np.array(measurements)
+        for i in range(_sensor_count):
+            measurements.append(i)
+        return np.array(measurements, dtype=np.float32)
 
     def show_render(self, _ray_count=128, _show=True, _save=''):
         img = mi.render(self.mi_scene, spp=_ray_count) * 0.01
