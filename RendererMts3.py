@@ -62,7 +62,7 @@ class RendererMts3():
         else:
             width = int(cam['width'])
             height = int(cam['height'])
-            fov = float(cam['fov']) * 1.3
+            fov = float(cam['fov'])
             origin = cam['origin'].tolist()
             target = cam['target'].tolist()
 
@@ -100,7 +100,7 @@ class RendererMts3():
         '''
 
         # DEBUG AXIS
-        RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
+        #RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = sensor_count
@@ -108,7 +108,7 @@ class RendererMts3():
 
     def render(self, _ray_count) -> None:
         measurements = []
-        for i in range(self.sensor_count ):
+        for i in range(self.sensor_count):
             img = mi.render(self.mi_scene, sensor=i+1, spp=_ray_count)
             measurements.append(img.array)
         if len(measurements) > 0:
@@ -150,6 +150,7 @@ class RendererMts3():
             'camera_base': {
                 'type': 'perspective',
                 'fov': _fov,
+                'fov_axis': 'y',
                 'to_world': mi.ScalarTransform4f.look_at(
                     origin=_cam_origin,
                     target=_cam_target,
