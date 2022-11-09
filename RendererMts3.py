@@ -1,5 +1,5 @@
 from distutils.log import debug
-import os, logging
+import os, logging, sys
 import dateutil
 import dateutil.parser
 import datetime
@@ -26,20 +26,21 @@ class RendererMts3():
         self.verbose = _verbose
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
-
+        
+        mi.set_variant("scalar_rgb")
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _spp=16, _cam_origin=origin, _cam_target=target)
 
     def load_binary(self, _binary_array, _latitude, _longitude, _datetime_str, _spp, cam = None) -> None:
         scene_dict = binary_loader.load_binary(_binary_array, self.verbose)
-        return self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp, cam)
+        self.load_sim_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp, cam)
 
     def load_path(self, _path, _latitude, _longitude, _datetime_str, _spp) -> None:
         scene_dict = binary_loader.load_path(_path, self.verbose)
-        self.load_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
+        self.load_sim_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
-    def load_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp, cam = None) -> None:
-        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
+    def load_sim_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp, _cam = None) -> None:
+        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)        
         logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
         logging.debug(f"Sensor count: {sensor_count}")
 
@@ -51,27 +52,31 @@ class RendererMts3():
             height += 0.5
         scene_center = avgv.tolist()
 
+        self.load_dict(sim_objects, sensor_count, _latitude, _longitude, _datetime_str, _spp, _cam)
+
+    def load_dict(self, _scene_dict, _sensor_count, _latitude, _longitude, _datetime_str, _spp, _cam = None) -> None:
+        
         scene_center = [2.5,0.0,0.0]; height = 5.0; distance = 7.0
 
-        if cam is None:
+        if _cam is None:
             origin, target = RendererMts3.get_camera(height, distance, scene_center)
             width = 512
             height = width
             fov = 70
             logging.debug(f'camera origin: {origin}, target: {target}')
         else:
-            width = int(cam['width'])
-            height = int(cam['height'])
-            fov = float(cam['fov'])
-            origin = cam['origin'].tolist()
-            target = cam['target'].tolist()
+            width = int(_cam['width'])
+            height = int(_cam['height'])
+            fov = float(_cam['fov'])
+            origin = _cam['origin'].tolist()
+            target = _cam['target'].tolist()
 
         self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _width=width, _height=height, _fov=fov, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
-        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
+        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0, _disable_sky=True)
 
-        merged_scene = {**self.mi_base_scene, **sun_sky, **sim_objects}
+        merged_scene = {**self.mi_base_scene, **sun_sky, **_scene_dict}
 
         '''
         transf = T(np.array([
@@ -100,10 +105,10 @@ class RendererMts3():
         '''
 
         # DEBUG AXIS
-        #RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
+        RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
 
         self.mi_scene = mi.load_dict(merged_scene)
-        self.sensor_count = sensor_count
+        self.sensor_count = _sensor_count
         return merged_scene
 
     def render(self, _ray_count) -> None:
@@ -150,7 +155,6 @@ class RendererMts3():
             'camera_base': {
                 'type': 'perspective',
                 'fov': _fov,
-                'fov_axis': 'y',
                 'to_world': mi.ScalarTransform4f.look_at(
                     origin=_cam_origin,
                     target=_cam_target,
@@ -167,44 +171,44 @@ class RendererMts3():
                 }
             }
         }
-
-        base_scene['ground_top'] = {
-            'type': 'disk',
-            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], -90.0), # Y up
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+        if 0:
+            base_scene['ground_top'] = {
+                'type': 'disk',
+                'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], -90.0), # Y up
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
-        }
 
-        base_scene['ground_bottom'] = {
-            'type': 'disk',
-            'to_world': mi.ScalarTransform4f.translate([0, -10, 0]).scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            base_scene['ground_bottom'] = {
+                'type': 'disk',
+                'to_world': mi.ScalarTransform4f.translate([0, -10, 0]).scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
-        }
 
-        base_scene['ground_side'] = {
-            'type': 'cylinder',
-            'radius': _size,
-            'p0': [0, -10, 0],
-            'p1': [0, 0, 0],
-            'material': {
-                'type': 'diffuse',
-                'reflectance': {
-                    'type': 'rgb',
-                    'value': [0.5, 0.5, 0.5]
+            base_scene['ground_side'] = {
+                'type': 'cylinder',
+                'radius': _size,
+                'p0': [0, -10, 0],
+                'p1': [0, 0, 0],
+                'material': {
+                    'type': 'diffuse',
+                    'reflectance': {
+                        'type': 'rgb',
+                        'value': [0.5, 0.5, 0.5]
+                    }
                 }
             }
-        }
 
         return base_scene
 
@@ -275,7 +279,7 @@ class RendererMts3():
                 },
             }
 
-        mesh = mi.load_dict(ply)
+        mesh = mi.load_dict(ply)        
         os.remove(tmp_file_name)
 
         return mesh
@@ -455,9 +459,9 @@ class RendererMts3():
 
         mi_scene = {}
 
-        minv = np.array([-5,-5,-5])
+        minv = np.array([sys.float_info.max]*3)
         avgv = np.array([0.0,0.0,0.0])
-        maxv = -minv
+        maxv = np.array([sys.float_info.min]*3)
 
         # add sensors
         sensor_count = 0
@@ -477,8 +481,8 @@ class RendererMts3():
 
                 if pos is not None:
                     avgv += pos
-                    minv = np.maximum(minv, pos)
-                    maxv = np.minimum(maxv, pos)
+                    minv = np.minimum(minv, pos)
+                    maxv = np.maximum(maxv, pos)
 
                 primitive = primitive_map[data['type']](data)
                 primitive['sensor'] = {
@@ -514,6 +518,8 @@ class RendererMts3():
 
         if sensor_count < 1:
             logging.warn('No sensors defined.')
+        else:
+            avgv /= sensor_count
 
         return mi_scene, (minv, avgv, maxv), sensor_count
 
@@ -570,7 +576,7 @@ class RendererMts3():
         }
 
     @staticmethod
-    def get_sun_sky(_direction, _power=1000.0):
+    def get_sun_sky(_direction, _power=1000.0, _disable_sky=False):
 
         _dot = np.dot([0,1,0], _direction)
         dot_scaler = np.max([0.0, _dot])
@@ -580,7 +586,8 @@ class RendererMts3():
 
         scene = {}
         scene['sun'] = RendererMts3.get_sun(_direction, sun_power)
-        scene['sky'] = RendererMts3.get_sky(sky_power)
+        if not _disable_sky:
+            scene['sky'] = RendererMts3.get_sky(sky_power)
 
         return scene, sun_power, sky_power
 
