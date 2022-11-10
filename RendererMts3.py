@@ -74,7 +74,7 @@ class RendererMts3():
         self.mi_base_scene  = RendererMts3.create_base_scene(default_ground_size, _width=width, _height=height, _fov=fov, _spp=_spp, _cam_origin=origin, _cam_target=target)
 
         sun_direction = RendererMts3.get_sun_direction(_latitude, _longitude, _datetime_str)
-        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0, _disable_sky=True)
+        sun_sky, _, _ = RendererMts3.get_sun_sky(sun_direction, 1000.0)
 
         merged_scene = {**self.mi_base_scene, **sun_sky, **_scene_dict}
 
@@ -105,7 +105,7 @@ class RendererMts3():
         '''
 
         # DEBUG AXIS
-        RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
+        #RendererMts3.add_axis_spheres(merged_scene, [2.5, 0.0, 2.5])
 
         self.mi_scene = mi.load_dict(merged_scene)
         self.sensor_count = _sensor_count
@@ -171,44 +171,44 @@ class RendererMts3():
                 }
             }
         }
-        if 0:
-            base_scene['ground_top'] = {
-                'type': 'disk',
-                'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], -90.0), # Y up
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
-                }
-            }
 
-            base_scene['ground_bottom'] = {
-                'type': 'disk',
-                'to_world': mi.ScalarTransform4f.translate([0, -10, 0]).scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+        base_scene['ground_top'] = {
+            'type': 'disk',
+            'to_world': mi.ScalarTransform4f.scale([_size, _size, _size]).rotate([1, 0, 0], -90.0), # Y up
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
+        }
 
-            base_scene['ground_side'] = {
-                'type': 'cylinder',
-                'radius': _size,
-                'p0': [0, -10, 0],
-                'p1': [0, 0, 0],
-                'material': {
-                    'type': 'diffuse',
-                    'reflectance': {
-                        'type': 'rgb',
-                        'value': [0.5, 0.5, 0.5]
-                    }
+        base_scene['ground_bottom'] = {
+            'type': 'disk',
+            'to_world': mi.ScalarTransform4f.translate([0, -10, 0]).scale([_size, _size, _size]).rotate([1, 0, 0], 90.0), # Y up
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
                 }
             }
+        }
+
+        base_scene['ground_side'] = {
+            'type': 'cylinder',
+            'radius': _size,
+            'p0': [0, -10, 0],
+            'p1': [0, 0, 0],
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': [0.5, 0.5, 0.5]
+                }
+            }
+        }
 
         return base_scene
 
@@ -558,21 +558,39 @@ class RendererMts3():
 
     @staticmethod
     def get_sun(_direction, _power):
-        return {
+        '''return {
             'type': 'directional',
             'direction':  [v*-1.0 for v in _direction],
             'irradiance': {
                 'type': 'rgb',
                 'value': _power,
             }
+        }'''
+        return {
+            'type': 'disk',
+            'to_world': mi.ScalarTransform4f().look_at([v*100.0 for v in _direction], [0,0,0], [0,1,0]).scale(10.0),
+            'emitter': {
+                'type': 'area',
+                'radiance': {
+                    'type': 'rgb',
+                    'value': _power*10.0,
+                }
+            }
         }
 
     @staticmethod
     def get_sky(_power):
-        return {
+        '''return {
             'type': 'envmap',
             'filename': "./imgs/stuttgart_hillside_1k.exr",
             'scale': _power,
+        }'''
+        return {
+            'type': 'constant',
+            'radiance': {
+                'type': 'rgb',
+                'value': _power,
+            }
         }
 
     @staticmethod
@@ -582,7 +600,7 @@ class RendererMts3():
         dot_scaler = np.max([0.0, _dot])
 
         sun_power = dot_scaler * _power * 5.0/6.0 # -1/6 for clowdy sky
-        sky_power = dot_scaler * 1.0
+        sky_power = dot_scaler * 10.0
 
         scene = {}
         scene['sun'] = RendererMts3.get_sun(_direction, sun_power)

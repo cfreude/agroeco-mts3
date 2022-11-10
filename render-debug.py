@@ -21,7 +21,7 @@ def get_sensor_icosphere(_sensor, _color_array=None, _spp=128):
         key = f'obj{i}'
 
         scene[key] = {
-            'type': 'disk',
+            'type': 'sphere',
             'to_world': mi.ScalarTransform4f().translate([0,2,0]).look_at(v, (v*2).tolist(), [0,1,0]).scale(scale),
             'material': {
                 'type': 'diffuse',
@@ -179,7 +179,7 @@ def day_cylce_test_sensors(_spp):
     #test_sensor_cubegrid(c, start.isoformat()+'+01:00', 128); quit()
     while (start <= end):
         print(start)
-        test_sensors(c, start.isoformat()+'+1:00', 1024)
+        test_sensors(c, start.isoformat()+'+1:00', 1024*10)
         start += step
         c += 1
 
@@ -252,7 +252,8 @@ if __name__ == "__main__":
     FORMAT = '%(name)s :: %(levelname)-8s :: %(message)s'
     FORMAT = '%(levelname)-8s :: %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)
-    day_cylce_test_sensors(128); quit()
+    
+    #day_cylce_test_sensors(128); quit()
     
 
     #load_path('./data/t126.mesh', True); quit()
@@ -277,15 +278,14 @@ if __name__ == "__main__":
 
     # test day cycle
     #test_day_cylce(); quit()
-    start = datetime.datetime(2022, 1, 30)
-    end = datetime.datetime(2021, 2, 2)
+    start = datetime.datetime(2022, 4, 15, 6, 0, 0)
+    end = datetime.datetime(2022, 4, 15, 20, 0, 0)
     step = datetime.timedelta(minutes=30)
     c = 1
 
-    print(start >= end)
-    while (start >=  end):
+    while (start <=  end):
         print(start)
-        main('./data/t1999.prim', 48.21, 16.36, start.isoformat()+'+01:00', 4, _save_render=f'./{str(c).zfill(5)}.jpg')
+        main('./data/t1999.prim', 48.21, 16.36, start.isoformat()+'+01:00', 16, _save_render=f'./tmp/{str(c).zfill(5)}.jpg')
         start += step
         c += 1
 
