@@ -118,6 +118,7 @@ class RendererMts3():
             logging.warn('No measurements computed.')
             return None
 
+    #used for debug overlay, renders the scene from a custom camera (camera parameters are incl. in the request)
     def render_for_cam(self, _ray_count):
         result = np.array(mi.render(self.mi_scene, spp=_ray_count).array)
         rgb = result[np.mod(np.arange(result.size), 4) != 3]
