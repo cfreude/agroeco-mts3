@@ -574,7 +574,7 @@ class RendererMts3():
         }'''
         return {
             'type': 'disk',
-            'to_world': mi.ScalarTransform4f().look_at([v*100.0 for v in _direction], [0,0,0], [0,1,0]).scale(10.0),
+            'to_world': mi.ScalarTransform4f().look_at(origin=[v*100.0 for v in _direction], target=[0,0,0], up=[0,1,0]).scale(10.0),
             'emitter': {
                 'type': 'area',
                 'radiance': {
