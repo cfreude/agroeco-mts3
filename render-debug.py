@@ -3,6 +3,185 @@ import numpy as np
 from RendererMts3 import RendererMts3
 from render import main
 from binary_loader import load_path
+import itertools    
+import mitsuba as mi
+
+def get_sensor_icosphere(_sensor, _color_array=None, _spp=128):
+    from icosphere import icosphere
+    nu = 8  # or any other integer
+    vertices, _ = icosphere(nu)
+
+    scene = {}
+
+    for i, v in enumerate(vertices):    
+        
+        v=v*1.5 # size
+        scale = 0.1
+        color = [0.5, 0.5, 0.5] if _color_array is None else _color_array[i]
+        key = f'obj{i}'
+
+        scene[key] = {
+            'type': 'sphere',
+            'to_world': mi.ScalarTransform4f().translate([0,2,0]).look_at(v, (v*2).tolist(), [0,1,0]).scale(scale),
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': color,
+                },
+            },
+        }
+        
+        if _sensor:
+            scene[key]['sensor'] = {
+                'type': 'irradiancemeter',
+                'sampler': {
+                    'type': 'independent',
+                    'sample_count': _spp
+                },
+                'film': {
+                    'type': 'hdrfilm',
+                    'width': 1,
+                    'height': 1,
+                    'rfilter': {
+                        'type': 'box',
+                    },
+                    'pixel_format': 'rgb',
+                },
+            }
+
+    return scene, vertices.shape[0]
+
+
+def get_sensor_cubegrid(_sensor, _color_array=None, _spp=128):
+
+    scene = {}
+
+    count = 10
+    x = np.linspace(-1., 1., count, endpoint=True)
+    y = np.linspace(1., 3., count, endpoint=True)
+    z = np.linspace(-1., 1., count, endpoint=True)
+    xyz = list(itertools.product(x,y,z))
+
+    for i, coord in enumerate(xyz):
+        
+        color = [0.5, 0.5, 0.5] if _color_array is None else _color_array[i]
+        key = f'obj{i}'
+
+        scene[key] = {
+            'type': 'cube',
+            'to_world': mi.ScalarTransform4f().translate(coord).scale(1.0/float(count)),
+            'material': {
+                'type': 'diffuse',
+                'reflectance': {
+                    'type': 'rgb',
+                    'value': color,
+                },
+            },
+        }
+        
+        if _sensor:
+            scene[key]['sensor'] = {
+                'type': 'irradiancemeter',
+                'sampler': {
+                    'type': 'independent',
+                    'sample_count': _spp
+                },
+                'film': {
+                    'type': 'hdrfilm',
+                    'width': 1,
+                    'height': 1,
+                    'rfilter': {
+                        'type': 'box',
+                    },
+                    'pixel_format': 'rgb',
+                },
+            }
+
+    return scene, len(xyz)     
+
+def test_sensors(ind, datetime_str, _spp=128):
+
+    #geom_func = get_sensor_cubegrid
+    geom_func = get_sensor_icosphere
+
+    cam = {}
+    cam['width'] = cam['height'] = 512
+    cam['fov'] = fov = 70
+    cam['origin'] = origin = np.array([-2,4,5])
+    cam['target'] = target = np.array([0,2,0])
+
+    obstacle = {
+        'type': 'sphere',
+        'to_world': mi.ScalarTransform4f().translate([2,2,2]).scale(1.0),
+        'material': {
+            'type': 'diffuse',
+            'reflectance': {
+                'type': 'rgb',
+                'value': [0.5, 0.5, 0.5],
+            },
+        },
+    }
+    
+    scene, sensor_count = geom_func(True, None, _spp)
+    #scene['obst'] = obstacle
+
+    renderer = RendererMts3(False)
+
+    if 0:
+        scene['env'] = {
+            'type': 'constant',
+            'radiance': {
+                'type': 'rgb',
+                'value': 10.0,
+            }
+        }    
+
+        renderer.mi_base_scene = RendererMts3.create_base_scene(100.0, _spp=16, _cam_origin=origin.tolist(), _cam_target=target.tolist(), _fov=fov)
+        renderer.sensor_count = len(xyz)
+        merged_scene = {**renderer.mi_base_scene, **scene}    
+        renderer.mi_scene = mi.load_dict(merged_scene)
+
+    renderer.load_dict(scene, sensor_count, 48.21, 16.36, datetime_str, _spp, _cam=cam) 
+    measurements = renderer.render(_spp)
+     
+    renderer.show_render(16, False, _save=f'./tmp/{str(ind).zfill(5)}-render.jpg')
+    
+    # normalize
+    maxv = np.max(measurements)
+    if maxv == 0.0:
+        maxv = 1.0
+    
+    scene, _ = geom_func(False, [[v/maxv]*3 for v in measurements], _spp)    
+    #scene['obst'] = obstacle
+
+    scene['env'] = {
+        'type': 'constant',
+        'radiance': {
+            'type': 'rgb',
+            'value': 10.0,
+        }
+    }    
+
+    renderer.mi_base_scene = RendererMts3.create_base_scene(100.0, _spp=16, _cam_origin=origin.tolist(), _cam_target=target.tolist(), _fov=fov)
+    merged_scene = {**renderer.mi_base_scene, **scene}    
+    renderer.mi_scene = mi.load_dict(merged_scene)
+    renderer.show_render(16, _show=False, _save=f'./tmp/{str(ind).zfill(5)}-vis.jpg')
+
+def day_cylce_test_sensors(_spp):
+
+     # test day cycle
+    start = datetime.datetime(2022, 4, 15, 8, 0, 0)
+    end = datetime.datetime(2022, 4, 15, 20, 0, 0)
+    step = datetime.timedelta(minutes=120)
+    c = 1
+    
+    #test_sensor_cubegrid(c, start.isoformat()+'+01:00', 128); quit()
+    while (start <= end):
+        print(start)
+        test_sensors(c, start.isoformat()+'+1:00', 1024*10)
+        start += step
+        c += 1
 
 def test_day_cylce():
 
@@ -74,6 +253,9 @@ if __name__ == "__main__":
     FORMAT = '%(levelname)-8s :: %(message)s'
     logging.basicConfig(format=FORMAT, level=logging.INFO)
     
+    #day_cylce_test_sensors(128); quit()
+    
+
     #load_path('./data/t126.mesh', True); quit()
     #test_directional(); quit()
     
@@ -96,15 +278,14 @@ if __name__ == "__main__":
 
     # test day cycle
     #test_day_cylce(); quit()
-    start = datetime.datetime(2022, 1, 30)
-    end = datetime.datetime(2021, 2, 2)
+    start = datetime.datetime(2022, 4, 15, 6, 0, 0)
+    end = datetime.datetime(2022, 4, 15, 20, 0, 0)
     step = datetime.timedelta(minutes=30)
     c = 1
 
-    print(start >= end)
-    while (start >=  end):
+    while (start <=  end):
         print(start)
-        main('./data/t1999.prim', 48.21, 16.36, start.isoformat()+'+01:00', 4, _save_render=f'./{str(c).zfill(5)}.jpg')
+        main('./data/t1999.prim', 48.21, 16.36, start.isoformat()+'+01:00', 16, _save_render=f'./tmp/{str(c).zfill(5)}.jpg')
         start += step
         c += 1
 
