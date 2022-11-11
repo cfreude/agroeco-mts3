@@ -26,7 +26,7 @@ class RendererMts3():
         self.verbose = _verbose
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
-        
+
         mi.set_variant("scalar_rgb")
         origin, target = RendererMts3.get_camera(2.0, 4.0)
         self.mi_base_scene = RendererMts3.create_base_scene(default_ground_size, _spp=16, _cam_origin=origin, _cam_target=target)
@@ -40,7 +40,7 @@ class RendererMts3():
         self.load_sim_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
     def load_sim_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp, _cam = None) -> None:
-        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)        
+        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
         logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
         logging.debug(f"Sensor count: {sensor_count}")
 
@@ -55,7 +55,7 @@ class RendererMts3():
         self.load_dict(sim_objects, sensor_count, _latitude, _longitude, _datetime_str, _spp, _cam)
 
     def load_dict(self, _scene_dict, _sensor_count, _latitude, _longitude, _datetime_str, _spp, _cam = None) -> None:
-        
+
         scene_center = [2.5,0.0,0.0]; height = 5.0; distance = 7.0
 
         if _cam is None:
@@ -160,6 +160,7 @@ class RendererMts3():
             'camera_base': {
                 'type': 'perspective',
                 'fov': _fov,
+                'fov_axis': 'y',
                 'to_world': mi.ScalarTransform4f.look_at(
                     origin=_cam_origin,
                     target=_cam_target,
@@ -284,7 +285,7 @@ class RendererMts3():
                 },
             }
 
-        mesh = mi.load_dict(ply)        
+        mesh = mi.load_dict(ply)
         os.remove(tmp_file_name)
 
         return mesh
