@@ -729,3 +729,9 @@ class RendererMts3():
             im.set_data(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             fig.canvas.draw_idle()
             plt.pause(0.1)
+
+    @staticmethod
+    def get_sun_radius(distance):
+        half_sun_disk_angle = 0.26095 * 0.5
+        distance = 100.0
+        return np.tan(half_sun_disk_angle * np.pi / 180.0) * distance
