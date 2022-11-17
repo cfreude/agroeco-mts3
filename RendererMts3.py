@@ -124,11 +124,12 @@ class RendererMts3():
                 measurements.append(img.array)
             measurements = np.array(measurements)
         if len(measurements) > 0:
+            logging.info(measurements.shape)
             sum = np.sum(measurements, axis=1)            
             minv = np.min(sum)
             mean = np.mean(sum)            
             maxv = np.max(sum)
-            print(minv, mean, maxv)
+            logging.info(f'{minv}, {mean}, {maxv}')
             return sum
         else:
             logging.warn('No measurements computed.')
