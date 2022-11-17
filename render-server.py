@@ -23,14 +23,16 @@ class RenderServer(BaseHTTPRequestHandler):
             rays = int(rays)
 
         if args.dummy:
+            print("DUMMY MODE")
             count = int(self.headers['C'])
-            measurements = np.ones(count, dtype=np.float32)
+            #measurements = np.ones(count, dtype=np.float32)
+            measurements = renderer.render_dummy(count)
         else:
             if camera is None:
                 renderer.load_binary(rawData, latitude, longitude, datetime, rays)
                 measurements = renderer.render(rays)
             else:
-                print(camera)
+                #print(camera)
                 allCameraParams = np.fromstring(camera, dtype=np.float32, sep=' ')
                 cam = {}
                 cam['origin'] = np.array(allCameraParams[:3])
