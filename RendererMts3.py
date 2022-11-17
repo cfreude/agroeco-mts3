@@ -14,16 +14,17 @@ import binary_loader
 #mi.set_variant("llvm_ad_rgb")
 mi.set_variant("scalar_rgb")
 
-from mitsuba import PositionSample3f, ScalarTransform4f as T, SurfaceInteraction3f
+from mitsuba import ScalarTransform4f as T
 
 default_ground_size = 1e6 #100 km
 
 class RendererMts3():
 
-    def __init__(self, _verbose=False) -> None:
+    def __init__(self, _verbose=False, _use_batch_render=False) -> None:
         self.mi_scene = None
         self.sensor_count = None
         self.verbose = _verbose
+        self.use_batch = _use_batch_render
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
 
@@ -40,7 +41,7 @@ class RendererMts3():
         self.load_sim_dict(scene_dict,_latitude, _longitude, _datetime_str, _spp)
 
     def load_sim_dict(self, _scene_dict, _latitude, _longitude, _datetime_str, _spp, _cam = None) -> None:
-        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp)
+        sim_objects, (minv, avgv, maxv), sensor_count = RendererMts3.load_sim_scene(_scene_dict, _spp, self.use_batch)        
         logging.debug(f"Scene statistics: {minv}, {avgv}, {maxv}")
         logging.debug(f"Sensor count: {sensor_count}")
 
@@ -114,11 +115,21 @@ class RendererMts3():
 
     def render(self, _ray_count) -> None:
         measurements = []
-        for i in range(self.sensor_count):
-            img = mi.render(self.mi_scene, sensor=i+1, spp=_ray_count)
-            measurements.append(img.array)
+        if self.use_batch:
+            measurements = mi.render(self.mi_scene, sensor=1, spp=_ray_count)
+            measurements = np.squeeze(measurements, axis=0)
+        else:
+            for i in range(self.sensor_count):
+                img = mi.render(self.mi_scene, sensor=i+1, spp=_ray_count)
+                measurements.append(img.array)
+            measurements = np.array(measurements)
         if len(measurements) > 0:
-            return np.sum(np.array(measurements), axis=1)
+            sum = np.sum(measurements, axis=1)            
+            minv = np.min(sum)
+            mean = np.mean(sum)            
+            maxv = np.max(sum)
+            print(minv, mean, maxv)
+            return sum
         else:
             logging.warn('No measurements computed.')
             return None
@@ -311,12 +322,11 @@ class RendererMts3():
         return triangle_vertex_positions, triangle_indices
 
     @staticmethod
-    def load_sim_scene(_scene_data, _spp=128):
-
+    def load_sim_scene(_scene_data, _spp=128, _use_batch=False):
         if _scene_data['format'] == 1:
             return RendererMts3.load_sim_scene_meshes(_scene_data, _spp)
         elif _scene_data['format'] == 2:
-            return RendererMts3.load_sim_scene_primitives(_scene_data, _spp)
+            return RendererMts3.load_sim_scene_primitives(_scene_data, _spp, _use_batch=_use_batch)
 
     @staticmethod
     def load_sim_scene_meshes(_scene_data, _spp=128):
@@ -446,7 +456,7 @@ class RendererMts3():
         return out
 
     @staticmethod
-    def load_sim_scene_primitives(_scene_data, _spp=128):
+    def load_sim_scene_primitives(_scene_data, _spp=128, _use_batch=False):
 
         #(1 = disk, 2 = cylinder/stem, 4 = sphere/shoot, 8 = rectangle/leaf)
         primitive_map = {
@@ -464,6 +474,8 @@ class RendererMts3():
         }
 
         mi_scene = {}
+
+        batch_shapes = []
 
         minv = np.array([sys.float_info.max]*3)
         avgv = np.array([0.0,0.0,0.0])
@@ -491,7 +503,7 @@ class RendererMts3():
                     maxv = np.maximum(maxv, pos)
 
                 primitive = primitive_map[data['type']](data)
-                primitive['sensor'] = {
+                sensor = {
                     'type': 'irradiancemeter',
                     'sampler': {
                         'type': 'independent',
@@ -506,9 +518,46 @@ class RendererMts3():
                         },
                         'pixel_format': 'rgb',
                     },
-                }
-                mi_scene[surface_name] = mi.load_dict(primitive)
+                }                
+
+                if _use_batch:
+                    mi_scene[f'{surface_name}-sensor'] = sensor
+                    primitive[f'{surface_name}-shape-sensor-ref'] = {
+                            'type': 'ref',
+                            'id': f'{surface_name}-sensor',
+                        }
+                    batch_shapes.append((surface_name, primitive))
+                else:
+                    primitive['sensor'] = sensor
+                    mi_scene[surface_name] = mi.load_dict(primitive)
                 sensor_count += 1
+
+        if _use_batch:
+            batch_sensor = {
+                'type': 'batch',        
+                'sampler': {
+                    'type': 'independent',
+                    'sample_count': _spp,
+                },
+                'film': {
+                    'type': 'hdrfilm',
+                    'width': sensor_count,
+                    'height': 1,
+                    'rfilter': {
+                        'type': 'box',
+                    },
+                    'pixel_format': 'rgb',
+                },
+            }
+
+            for (surface_name, primitive) in batch_shapes:
+                batch_sensor[f'{surface_name}-batch-sensor-ref'] = {
+                        'type': 'ref',
+                        'id': f'{surface_name}-sensor',
+                    }
+                mi_scene[surface_name] = primitive
+
+            mi_scene['dbatchsensor'] = batch_sensor
 
         # add obstacles
         objects = _scene_data['obstacles']
@@ -735,3 +784,9 @@ class RendererMts3():
             im.set_data(mi.util.convert_to_bitmap((img / (img+1.0)) ** (1.0/2.2)))
             fig.canvas.draw_idle()
             plt.pause(0.1)
+
+    @staticmethod
+    def get_sun_radius(distance):
+        half_sun_disk_angle = 0.26095 * 0.5
+        distance = 100.0
+        return np.tan(half_sun_disk_angle * np.pi / 180.0) * distance
