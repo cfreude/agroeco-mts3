@@ -11,20 +11,20 @@ from pysolar.solar import *
 import binary_loader
 
 #mi.set_variant("cuda_ad_rgb")
-#mi.set_variant("llvm_ad_rgb")
-mi.set_variant("scalar_rgb")
+mi.set_variant("llvm_ad_rgb")
+#mi.set_variant("scalar_rgb")
 
-from mitsuba import PositionSample3f, ScalarTransform4f as T, SurfaceInteraction3f
+from mitsuba import ScalarTransform4f as T
 
 default_ground_size = 1e6 #100 km
 
 class RendererMts3():
 
-    def __init__(self, _verbose=False) -> None:
+    def __init__(self, _verbose=False, _use_batch_render=False) -> None:
         self.mi_scene = None
         self.sensor_count = None
         self.verbose = _verbose
-        self.use_batch = True
+        self.use_batch = _use_batch_render
 
         logging.info('Mitsuba3 - available variants: %s', mi.variants())
         
@@ -116,12 +116,19 @@ class RendererMts3():
         measurements = []
         if self.use_batch:
             measurements = mi.render(self.mi_scene, sensor=1, spp=_ray_count)
+            measurements = np.squeeze(measurements, axis=0)
         else:
             for i in range(self.sensor_count):
                 img = mi.render(self.mi_scene, sensor=i+1, spp=_ray_count)
                 measurements.append(img.array)
+            measurements = np.array(measurements)
         if len(measurements) > 0:
-            return np.sum(np.array(measurements), axis=1)
+            sum = np.sum(measurements, axis=1)            
+            minv = np.min(sum)
+            mean = np.mean(sum)            
+            maxv = np.max(sum)
+            print(minv, mean, maxv)
+            return sum
         else:
             logging.warn('No measurements computed.')
             return None
@@ -137,7 +144,7 @@ class RendererMts3():
         return np.array(measurements)
 
     def show_render(self, _ray_count=128, _show=True, _save=''):
-        img = mi.render(self.mi_scene, sensor=0, spp=_ray_count) * 0.01
+        img = mi.render(self.mi_scene, spp=_ray_count) * 0.01
         if len(_save):
             logging.info(f'saving image to: {_save}')
             mi.util.write_bitmap(_save, img)
@@ -544,7 +551,7 @@ class RendererMts3():
                     }
                 mi_scene[surface_name] = primitive
 
-            mi_scene['batchsensor'] = batch_sensor
+            mi_scene['dbatchsensor'] = batch_sensor
 
         # add obstacles
         objects = _scene_data['obstacles']
