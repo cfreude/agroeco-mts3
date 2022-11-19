@@ -315,7 +315,7 @@ class RendererMts3():
 
         if _scene_data['format'] == 1:
             return RendererMts3.load_sim_scene_meshes(_scene_data, _spp)
-        elif _scene_data['format'] == 2:
+        elif _scene_data['format'] >= 2:
             return RendererMts3.load_sim_scene_primitives(_scene_data, _spp)
 
     @staticmethod

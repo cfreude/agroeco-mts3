@@ -42,7 +42,8 @@ def load_binary(binary_array, _verbose=False):
 
     map = {
         1: load_binary_mesh,
-        2: load_binary_primitives,
+        2: load_binary_primitives_clustered,
+        3: load_binary_primitives_interleaved,
     }
 
     if format in map:
@@ -53,7 +54,7 @@ def load_binary(binary_array, _verbose=False):
 
 
 def unpack(_i, _bin_arr, _str, _bytePerType=4, _print_name=None):
-    offset = len(_str) * _bytePerType 
+    offset = len(_str) * _bytePerType
     val = struct.unpack(_str, _bin_arr[_i:_i+offset])
     if len(_str) == 1: # extract single value from tuple
         val = val[0]
@@ -68,7 +69,7 @@ def load_mesh_entities(binary_array, _prefix, i, _verbose=False):
     entities = {}
     entitiesCount, i = unpack(i, binary_array, 'I', _print_name=f"{_prefix}-entitiesCount") # uint32
     for e in range(entitiesCount):
-        entity_key = f"{_prefix}-entitiy{e}"
+        entity_key = f"{_prefix}-entity{e}"
         surfacesCount, i = unpack(i, binary_array, 'I', _print_name=f"{entity_key}-surfacesCount") # uint32
         entities[entity_key] = {}
         for s in range(surfacesCount):
@@ -123,7 +124,7 @@ def load_binary_mesh(binary_array, _verbose=False, _offset=0):
     pointsCount, i = unpack(i, binary_array, 'I', _print_name='pointsCount') # uint32
     point_array = []
     for p in range(pointsCount):
-        point, i = unpack(i, binary_array, 'fff') # 3x float32        
+        point, i = unpack(i, binary_array, 'fff') # 3x float32
         point_array.append(point)
         [x, y, z] = point
         logging.debug(f'point #{p} | ({x}, {y}, {z}) | byte index: {i}')
@@ -214,10 +215,10 @@ def load_primitve_entities(binary_array, _prefix, i, _verbose=False):
     entitiesCount, i = unpack(i, binary_array, 'I', _print_name='entitiesCount' if _verbose else None)
     for e in range(entitiesCount):
         surfacesCount, i = unpack(i, binary_array, 'I', _print_name='surfacesCount' if _verbose else None)
-        entity_key = f"{_prefix}-entitiy{e}"
+        entity_key = f"{_prefix}-entity{e}"
         logging.debug(entity_key)
         entities[entity_key] = {}
-        for s in range(surfacesCount):            
+        for s in range(surfacesCount):
             surface_key = f"surface{s}"
             logging.debug(surface_key)
             primitiveType, i = unpack(i, binary_array, 'B', 1, _print_name='primitiveType' if _verbose else None)
@@ -226,8 +227,8 @@ def load_primitve_entities(binary_array, _prefix, i, _verbose=False):
 
     return entities, i
 
-def load_binary_primitives(binary_array, _verbose=False, _offset=0):
-    
+def load_binary_primitives_clustered(binary_array, _verbose=False, _offset=0):
+
     # ROW MAJOR MATRICES
     """
     uint8 version = 2
@@ -266,14 +267,77 @@ def load_binary_primitives(binary_array, _verbose=False, _offset=0):
             #case rectangle
             float32 matrix 4x3 (the bottom row is always 0 0 0 1)
     """
-    
+
     scene = {'format': 2}
     i = _offset
     logging.debug('Processing OBSTACLES ...')
-    scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)       
+    scene['obstacles'], i = load_primitve_entities(binary_array, 'obstacle', i, _verbose)
     logging.debug('Processing SENSORS ...')
     scene['sensors'], i = load_primitve_entities(binary_array, 'sensor', i, _verbose)
-    
+
+    if logging.root.level <= logging.DEBUG:
+        pass#pprint(scene)
+
+    return scene
+
+def load_binary_primitives_interleaved(binary_array, _verbose=False, _offset=0):
+    """
+    uint8 version = 3
+    #ENTITIES
+    uint32 entitiesCount
+    foreach ENTITY
+        uint32 surfacesCount
+        foreach SURFACE
+            uint8 primitiveType    #1 = disk, 2 = cylinder(stem), 4 = sphere(bud), 8 = rectangle(leaf)
+            #case disk
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #case cylinder
+            float32 length
+            float32 radius
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #case sphere
+            3xfloat32 center
+            float32 radius
+            #case rectangle
+            float32 matrix 4x3 (the bottom row is always 0 0 0 1)
+            #end switch
+            bool isSensor
+
+    #disk: anchored in the center, normal facing +Z, default radius <-1, +1>
+    #cylinder: anchored in the center of the bottom face; main axis +Y
+    #sphere: anchored in the center
+    #rectangle: anchored in the center, normal facing +Z
+    #matrix vector ordering: [ x.X, y.X, z.X, t.X, x.Y, y.Y, z.Y, t.Y, x.Z, y.Z, z.Z, t.Z ]
+    """
+
+    scene = {'format': 3}
+    i = _offset
+    logging.debug('Processing ...')
+
+    obstacles = {}
+    sensors = {}
+    entitiesCount, i = unpack(i, binary_array, 'I', _print_name='entitiesCount' if _verbose else None)
+    for e in range(entitiesCount):
+        surfacesCount, i = unpack(i, binary_array, 'I', _print_name='surfacesCount' if _verbose else None)
+        entity_key = f"entity{e}"
+        logging.debug(entity_key)
+        eObstacles = {}
+        eSensors = {}
+        for s in range(surfacesCount):
+            surface_key = f"surface{s}"
+            logging.debug(surface_key)
+            primitiveType, i = unpack(i, binary_array, 'B', 1, _print_name='primitiveType' if _verbose else None)
+            data, i = primitive_map[primitiveType](i, binary_array)
+            isSensor, i = unpack(i, binary_array, 'B', 1, _print_name='isSensor' if _verbose else None)
+            (eSensors if isSensor > 0 else eObstacles)[surface_key] = data
+        if (len(eObstacles) > 0):
+            obstacles[entity_key] = eObstacles
+        if (len(eSensors) > 0):
+            sensors[entity_key] = eSensors
+
+    scene['obstacles'] = obstacles
+    scene['sensors'] = sensors
+
     if logging.root.level <= logging.DEBUG:
         pass#pprint(scene)
 

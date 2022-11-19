@@ -82,10 +82,11 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.ERROR)
 
     logging.debug('Args: %s', args)
-
     renderer = RendererMts3(args.verbose)
 
     print("Starting rendering server ...")
     with HTTPServer(('', args.port), RenderServer) as server:
         print(f"Serving a renderer at port {args.port}")
+        print("Verbose mode enabled." if renderer.verbose else "")
+
         server.serve_forever()
