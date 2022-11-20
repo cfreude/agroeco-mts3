@@ -212,14 +212,14 @@ def test_directional():
 
     m_to_world = ScalarTransform4f::look_at(0.0f, ScalarPoint3f(direction), up);
     '''
-    import numpy as np
-    import mitsuba as mi
+    #import numpy as np
+    #import mitsuba as mi
 
     #mi.set_variant("cuda_ad_rgb")
     #mi.set_variant("llvm_ad_rgb")
-    mi.set_variant("scalar_rgb")
+    #mi.set_variant("scalar_rgb")
 
-    from mitsuba import ScalarTransform4f as T
+    #from mitsuba import ScalarTransform4f as T
 
     direction = [1, 1, 0]
     
@@ -268,11 +268,22 @@ if __name__ == "__main__":
     if 0:
         show_render = True
         # test MESH scene simulation / rendering
-        logging.info('Mesh test:')
-        main('./data/t1999.mesh', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
+        #logging.info('Mesh test:')
+        #main('./data/t1999.mesh', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
         # test PRIMITIVE scene simulation / rendering
         logging.info('Primitive test:')
-        main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 128, _verbose=True, _show_render=show_render)
+        main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", 1280, _verbose=True, _show_render=show_render)
+        quit()
+    
+    if 1:
+        show_render = False
+        spp = 128
+        # test sequential scene simulation / rendering
+        logging.info('Sequential rendering test:')
+        main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", spp, _verbose=True, _show_render=show_render)
+        # test parallel/batch scene simulation / rendering
+        logging.info('Parallel/Batch rendering test:')
+        main('./data/t1999.prim', 48.21, 16.36, "2022-08-23T10:34:48+00:00", spp, _verbose=True, _use_batch_rendering=True, _show_render=show_render)
         quit()
 
 

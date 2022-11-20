@@ -1,11 +1,11 @@
 import os, logging, time
 from RendererMts3 import RendererMts3
 
-def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _show_render=False, _save_render=''):
+def main(_path, _lat, _long, _datetime_str, _ray_count=128, _verbose=False, _use_batch_rendering=False, _show_render=False, _save_render=''):
 
     t_total = time.perf_counter_ns()
     
-    renderer = RendererMts3(_verbose)
+    renderer = RendererMts3(_verbose, _use_batch_rendering)
     logging.info(f'Renderer initialization dur.: {(time.perf_counter_ns()-t_total) /1e9:.2f} sec.')
     
     t = time.perf_counter_ns()    
