@@ -1,0 +1,16 @@
+# INIT: conda env create -f .conda.yml
+# UPDATE: conda env update --file .conda.yml --prune
+name: mts3
+dependencies:
+  - python=3
+  - pip
+  - matplotlib
+  - pandas
+  - pip:
+    - mitsuba
+    - pysolar
+    - python-dateutil
+    - requests
+    - icosphere
+    - ladybug-radiance
+    - imageio

@@ -1,0 +1,5 @@
+Band no.,1,2,3,4,5,6,7,8
+Number of zones,32,30,28,24,18,12,6,1
+Altitude of band centre,6,18,30,42,54,66,78,90
+Azimuth increment,"11,25",12,"12,86",15,20,30,60,
+Angular width of zone at band centre,"11,19","11,41","11,13","11,15","11,76","12,2","12,47",
